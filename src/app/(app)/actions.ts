@@ -45,7 +45,7 @@ function oneOf<T extends string>(v: string, list: { value: T }[], fallback: T): 
 
 // ---------- clients ----------
 export async function createCompany(fd: FormData) {
-  await requireProfile();
+  await requireAdmin();
   const name = str(fd, "name");
   if (!name) fail("/clients", "Enter a client name.");
   const supabase = await createClient();
@@ -56,7 +56,7 @@ export async function createCompany(fd: FormData) {
 
 // ---------- projects ----------
 export async function createProject(fd: FormData) {
-  const me = await requireProfile();
+  const me = await requireAdmin();
   const name = str(fd, "name");
   if (!name) fail("/projects", "Enter a project name.");
   const supabase = await createClient();
@@ -76,7 +76,7 @@ export async function createProject(fd: FormData) {
 }
 
 export async function updateProject(fd: FormData) {
-  await requireProfile();
+  await requireAdmin();
   const id = str(fd, "id");
   const path = `/projects/${id}`;
   const name = str(fd, "name");
@@ -112,7 +112,7 @@ export async function deleteProject(fd: FormData) {
 
 // ---------- tasks ----------
 export async function createTask(fd: FormData) {
-  await requireProfile();
+  await requireAdmin();
   const projectId = str(fd, "project_id");
   const back = safePath(str(fd, "redirect_to"), `/projects/${projectId}`);
   const title = str(fd, "title");
@@ -130,7 +130,7 @@ export async function createTask(fd: FormData) {
 }
 
 export async function updateTask(fd: FormData) {
-  await requireProfile();
+  await requireAdmin();
   const id = str(fd, "id");
   const path = `/tasks/${id}`;
   const title = str(fd, "title");
@@ -156,7 +156,10 @@ export async function updateTask(fd: FormData) {
   done(path, "Task saved.");
 }
 
-/** Quick status change from a list; same version check as the full edit. */
+/**
+ * Quick status change from a list; same version check as the full edit.
+ * Admins can change any task; members only tasks assigned to them (enforced by RLS).
+ */
 export async function setTaskStatus(fd: FormData) {
   await requireProfile();
   const back = safePath(str(fd, "redirect_to"), "/");
@@ -168,7 +171,9 @@ export async function setTaskStatus(fd: FormData) {
     .eq("version", int(fd, "version"))
     .select("id");
   if (error) fail(back, error.message);
-  if (!data?.length) fail(back, "That task was just changed by someone else. The list is refreshed — try again.");
+  if (!data?.length) {
+    fail(back, "That task was just changed by someone else, or isn't assigned to you. The list is refreshed — try again.");
+  }
   done(back);
 }
 
@@ -234,13 +239,38 @@ export async function logTime(fd: FormData) {
   done(back, `Logged ${hours} h.`);
 }
 
+/** Edit a time entry: your own, or anyone's if you're an admin (enforced by RLS). */
+export async function updateTime(fd: FormData) {
+  await requireProfile();
+  const back = safePath(str(fd, "redirect_to"), "/time");
+  const hours = Number.parseFloat(str(fd, "hours"));
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) fail(back, "Hours must be between 0 and 24.");
+  const workDate = optDate(fd, "work_date");
+  if (!workDate) fail(back, "Pick a date.");
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("time_entries")
+    .update({
+      work_date: workDate,
+      hours,
+      hour_type: oneOf(str(fd, "hour_type"), HOUR_TYPES, "billable"),
+      note: opt(fd, "note"),
+    })
+    .eq("id", str(fd, "id"))
+    .select("id");
+  if (error) fail(back, error.message);
+  if (!data?.length) fail(back, "You can only edit your own time entries.");
+  done(back, "Time entry updated.");
+}
+
+/** Remove a time entry: your own, or anyone's if you're an admin (enforced by RLS). */
 export async function deleteTime(fd: FormData) {
-  await requireAdmin();
+  await requireProfile();
   const back = safePath(str(fd, "redirect_to"), "/time");
   const supabase = await createClient();
   const { data, error } = await supabase.from("time_entries").delete().eq("id", str(fd, "id")).select("id");
   if (error) fail(back, error.message);
-  if (!data?.length) fail(back, "Only an admin can remove time entries.");
+  if (!data?.length) fail(back, "You can only remove your own time entries.");
   done(back, "Time entry removed.");
 }
 

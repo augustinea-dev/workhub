@@ -3,7 +3,7 @@ import { createProject } from "../actions";
 import { LiveRefresh, SubmitButton } from "@/components/client";
 import { Empty, Flash, PageHeader, ProjectBadge } from "@/components/ui";
 import { formatDate, todayISO } from "@/lib/dates";
-import { getCompanies, getPeople, nameOf, sp } from "@/lib/data";
+import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import type { ProjectStatus } from "@/lib/types";
@@ -49,6 +49,7 @@ export default async function ProjectsPage({
       </PageHeader>
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
+      {me.role === "admin" && (
       <details className="card mb-6 p-4" open={rows.length === 0}>
         <summary className="cursor-pointer text-sm font-semibold">+ New project</summary>
         <form action={createProject} className="mt-4 grid gap-3 md:grid-cols-5">
@@ -69,7 +70,7 @@ export default async function ProjectsPage({
             <label className="label" htmlFor="owner_id">Owner</label>
             <select id="owner_id" name="owner_id" className="input w-full" defaultValue={me.id}>
               {people.filter((p) => p.active).map((p) => (
-                <option key={p.id} value={p.id}>{p.full_name}</option>
+                <option key={p.id} value={p.id}>{personOption(p)}</option>
               ))}
             </select>
           </div>
@@ -87,6 +88,7 @@ export default async function ProjectsPage({
           </div>
         </form>
       </details>
+      )}
 
       <div className="card overflow-x-auto">
         {rows.length === 0 ? (

@@ -32,6 +32,11 @@ export function nameOf(people: Profile[], id: string | null | undefined): string
   return people.find((p) => p.id === id)?.full_name ?? "Former user";
 }
 
+/** Name plus email, for pickers, so people with similar names can't be confused. */
+export function personOption(p: Profile): string {
+  return `${p.full_name} (${p.email})`;
+}
+
 /** Next.js search params → first string value. */
 export function sp(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;

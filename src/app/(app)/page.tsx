@@ -80,26 +80,39 @@ export default async function MyWorkPage({
                 <h2 className={`border-b border-stone-200 px-4 py-3 text-sm font-semibold ${g.tone}`}>
                   {g.label} <span className="font-normal text-stone-400">· {g.items.length}</span>
                 </h2>
-                <ul>
-                  {g.items.map((t) => (
-                    <li key={t.id} className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-3 last:border-0">
-                      <div className="min-w-0 flex-1">
-                        <Link href={`/tasks/${t.id}`} className="font-medium hover:underline">
-                          {t.is_milestone && <span title="Milestone">◆ </span>}
-                          {t.title}
-                        </Link>
-                        <p className="truncate text-xs text-stone-500">
-                          {t.project?.company?.name ? `${t.project.company.name} · ` : ""}
-                          {t.project?.name}
-                        </p>
-                      </div>
-                      <span className={`w-16 text-right text-sm ${g.label === "Overdue" ? "text-red-700" : "text-stone-600"}`}>
-                        {formatDate(t.due_date)}
-                      </span>
-                      <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo="/" />
-                    </li>
-                  ))}
-                </ul>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[520px]">
+                    <thead>
+                      <tr>
+                        <th className="table-head">Task</th>
+                        <th className="table-head w-28">Due</th>
+                        <th className="table-head w-36">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.items.map((t) => (
+                        <tr key={t.id} className="hover:bg-stone-50">
+                          <td className="table-cell">
+                            <Link href={`/tasks/${t.id}`} className="font-medium hover:underline">
+                              {t.is_milestone && <span title="Milestone">◆ </span>}
+                              {t.title}
+                            </Link>
+                            <p className="truncate text-xs text-stone-500">
+                              {t.project?.company?.name ? `${t.project.company.name} · ` : ""}
+                              {t.project?.name}
+                            </p>
+                          </td>
+                          <td className={`table-cell whitespace-nowrap ${g.label === "Overdue" ? "font-medium text-red-700" : "text-stone-600"}`}>
+                            {formatDate(t.due_date)}
+                          </td>
+                          <td className="table-cell">
+                            <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo="/" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </section>
             ))}
         </div>

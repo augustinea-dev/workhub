@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { markAllRead } from "../actions";
 import { LiveRefresh, SubmitButton } from "@/components/client";
 import { Empty, PageHeader } from "@/components/ui";
@@ -22,7 +21,7 @@ export default async function InboxPage() {
   return (
     <>
       <LiveRefresh subs={[{ table: "notification_events", filter: `recipient_id=eq.${me.id}` }]} />
-      <PageHeader title="Inbox" subtitle={`${unread} unread`}>
+      <PageHeader title="Inbox" subtitle={`${unread} unread · opening a notification marks it read`}>
         {unread > 0 && (
           <form action={markAllRead}>
             <SubmitButton className="btn" pendingText="Marking…">Mark all read</SubmitButton>
@@ -39,7 +38,7 @@ export default async function InboxPage() {
                 <span className={`h-2 w-2 shrink-0 rounded-full ${n.read_at ? "bg-transparent" : "bg-blue-700"}`} />
                 <div className="min-w-0 flex-1">
                   {n.task_id ? (
-                    <Link href={`/tasks/${n.task_id}`} className="text-sm font-medium hover:underline">{n.summary}</Link>
+                    <a href={`/inbox/open/${n.id}`} className={`text-sm hover:underline ${n.read_at ? "" : "font-semibold"}`}>{n.summary}</a>
                   ) : (
                     <p className="text-sm font-medium">{n.summary}</p>
                   )}

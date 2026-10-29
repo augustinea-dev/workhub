@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteProject, updateProject } from "../../actions";
 import { LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
-import { Empty, Flash, PageHeader, ProjectBadge } from "@/components/ui";
+import { Empty, Flash, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
 import { formatDate, todayISO } from "@/lib/dates";
-import { getCompanies, getPeople, nameOf, sp } from "@/lib/data";
+import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { PROJECT_STATUSES, type Project, type Task } from "@/lib/types";
@@ -19,6 +19,7 @@ export default async function ProjectPage({
   const { id } = await params;
   const query = await searchParams;
   const me = await requireProfile();
+  const isAdmin = me.role === "admin";
   const supabase = await createClient();
 
   const [{ data: project }, { data: tasks }, { data: time }, people, companies] = await Promise.all([
@@ -67,109 +68,147 @@ export default async function ProjectPage({
             Tasks <span className="font-normal text-stone-400">· {open.length} open</span>
           </h2>
           {list.length === 0 ? (
-            <Empty>No tasks yet. Add the first one below.</Empty>
+            <Empty>No tasks yet.{isAdmin && " Add the first one below."}</Empty>
           ) : (
-            <ul>
-              {[...open, ...finished].map((t) => (
-                <li key={t.id} className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/tasks/${t.id}`}
-                      className={`font-medium hover:underline ${t.status === "done" ? "text-stone-400 line-through" : ""}`}
-                    >
-                      {t.is_milestone && <span title="Milestone">◆ </span>}
-                      {t.title}
-                    </Link>
-                    <p className="text-xs text-stone-500">{nameOf(people, t.assignee_id)}</p>
-                  </div>
-                  <span
-                    className={`w-16 text-right text-sm ${
-                      t.due_date && t.due_date < today && t.status !== "done" ? "font-medium text-red-700" : "text-stone-600"
-                    }`}
-                  >
-                    {formatDate(t.due_date)}
-                  </span>
-                  <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo={here} />
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px]">
+                <thead>
+                  <tr>
+                    <th className="table-head">Task</th>
+                    <th className="table-head">Assignee</th>
+                    <th className="table-head">Due</th>
+                    <th className="table-head">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...open, ...finished].map((t) => {
+                    const late = t.due_date && t.due_date < today && t.status !== "done";
+                    const canChange = isAdmin || t.assignee_id === me.id;
+                    return (
+                      <tr key={t.id} className="hover:bg-stone-50">
+                        <td className="table-cell">
+                          <Link
+                            href={`/tasks/${t.id}`}
+                            className={`font-medium hover:underline ${t.status === "done" ? "text-stone-400 line-through" : ""}`}
+                          >
+                            {t.is_milestone && <span title="Milestone">◆ </span>}
+                            {t.title}
+                          </Link>
+                        </td>
+                        <td className={`table-cell ${t.assignee_id === me.id ? "font-medium" : "text-stone-600"}`}>
+                          {t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id)}
+                        </td>
+                        <td className={`table-cell whitespace-nowrap ${late ? "font-medium text-red-700" : "text-stone-600"}`}>
+                          {formatDate(t.due_date)}
+                        </td>
+                        <td className="table-cell">
+                          {canChange ? (
+                            <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo={here} />
+                          ) : (
+                            <TaskBadge status={t.status} />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
-          <form action={createTask} className="grid gap-2 bg-stone-50 p-4 md:grid-cols-6">
-            <input type="hidden" name="project_id" value={id} />
-            <input name="title" required placeholder="New task…" aria-label="Task title" className="input md:col-span-3" />
-            <select name="assignee_id" aria-label="Assignee" className="input" defaultValue={me.id}>
-              <option value="">Unassigned</option>
-              {activePeople.map((x) => (
-                <option key={x.id} value={x.id}>{x.full_name}</option>
-              ))}
-            </select>
-            <input name="due_date" type="date" aria-label="Due date" className="input" />
-            <SubmitButton pendingText="Adding…">Add task</SubmitButton>
-            <label className="flex items-center gap-2 text-xs text-stone-600 md:col-span-6">
-              <input type="checkbox" name="is_milestone" /> Milestone
-            </label>
-          </form>
+          {isAdmin && (
+            <form action={createTask} className="border-t border-stone-200 bg-stone-50 p-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Add a task</p>
+              <div className="grid gap-2 md:grid-cols-6">
+                <input type="hidden" name="project_id" value={id} />
+                <input name="title" required placeholder="Task title" aria-label="Task title" className="input md:col-span-2" />
+                <select name="assignee_id" aria-label="Assignee" className="input md:col-span-2" defaultValue="">
+                  <option value="">Assign to… (unassigned)</option>
+                  {activePeople.map((x) => (
+                    <option key={x.id} value={x.id}>{personOption(x)}</option>
+                  ))}
+                </select>
+                <input name="due_date" type="date" aria-label="Due date" className="input" />
+                <SubmitButton pendingText="Adding…">Add task</SubmitButton>
+                <label className="flex items-center gap-2 text-xs text-stone-600 md:col-span-6">
+                  <input type="checkbox" name="is_milestone" /> Milestone
+                </label>
+              </div>
+            </form>
+          )}
         </section>
 
-        <section className="card p-4">
+        <section className="card h-fit p-4">
           <h2 className="mb-3 text-sm font-semibold">Project details</h2>
-          <form action={updateProject} className="space-y-3">
-            <input type="hidden" name="id" value={id} />
-            <input type="hidden" name="version" value={p.version} />
-            <div>
-              <label className="label" htmlFor="name">Name</label>
-              <input id="name" name="name" defaultValue={p.name} required className="input w-full" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label" htmlFor="status">Status</label>
-                <select id="status" name="status" defaultValue={p.status} className="input w-full">
-                  {PROJECT_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
+          {isAdmin ? (
+            <>
+              <form action={updateProject} className="space-y-3">
+                <input type="hidden" name="id" value={id} />
+                <input type="hidden" name="version" value={p.version} />
+                <div>
+                  <label className="label" htmlFor="name">Name</label>
+                  <input id="name" name="name" defaultValue={p.name} required className="input w-full" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label" htmlFor="status">Status</label>
+                    <select id="status" name="status" defaultValue={p.status} className="input w-full">
+                      {PROJECT_STATUSES.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="owner_id">Owner</label>
+                    <select id="owner_id" name="owner_id" defaultValue={p.owner_id ?? ""} className="input w-full">
+                      <option value="">—</option>
+                      {activePeople.map((x) => (
+                        <option key={x.id} value={x.id}>{personOption(x)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="label" htmlFor="company_id">Client</label>
+                  <select id="company_id" name="company_id" defaultValue={p.company_id ?? ""} className="input w-full">
+                    <option value="">— None —</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label" htmlFor="start_date">Start</label>
+                    <input id="start_date" name="start_date" type="date" defaultValue={p.start_date ?? ""} className="input w-full" />
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="due_date">Due</label>
+                    <input id="due_date" name="due_date" type="date" defaultValue={p.due_date ?? ""} className="input w-full" />
+                  </div>
+                </div>
+                <div>
+                  <label className="label" htmlFor="description">Description</label>
+                  <textarea id="description" name="description" rows={4} defaultValue={p.description ?? ""} className="input w-full" />
+                </div>
+                <SubmitButton>Save project</SubmitButton>
+              </form>
+              <form action={deleteProject} className="mt-4 border-t border-stone-100 pt-3">
+                <input type="hidden" name="id" value={id} />
+                <button className="btn-danger">Delete project and its tasks</button>
+              </form>
+            </>
+          ) : (
+            <dl className="space-y-3 text-sm">
+              <div><dt className="label">Status</dt><dd><ProjectBadge status={p.status} /></dd></div>
+              <div><dt className="label">Owner</dt><dd>{nameOf(people, p.owner_id)}</dd></div>
+              <div><dt className="label">Client</dt><dd>{company?.name ?? "—"}</dd></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><dt className="label">Start</dt><dd>{formatDate(p.start_date)}</dd></div>
+                <div><dt className="label">Due</dt><dd>{formatDate(p.due_date)}</dd></div>
               </div>
-              <div>
-                <label className="label" htmlFor="owner_id">Owner</label>
-                <select id="owner_id" name="owner_id" defaultValue={p.owner_id ?? ""} className="input w-full">
-                  <option value="">—</option>
-                  {activePeople.map((x) => (
-                    <option key={x.id} value={x.id}>{x.full_name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="label" htmlFor="company_id">Client</label>
-              <select id="company_id" name="company_id" defaultValue={p.company_id ?? ""} className="input w-full">
-                <option value="">— None —</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label" htmlFor="start_date">Start</label>
-                <input id="start_date" name="start_date" type="date" defaultValue={p.start_date ?? ""} className="input w-full" />
-              </div>
-              <div>
-                <label className="label" htmlFor="due_date">Due</label>
-                <input id="due_date" name="due_date" type="date" defaultValue={p.due_date ?? ""} className="input w-full" />
-              </div>
-            </div>
-            <div>
-              <label className="label" htmlFor="description">Description</label>
-              <textarea id="description" name="description" rows={4} defaultValue={p.description ?? ""} className="input w-full" />
-            </div>
-            <SubmitButton>Save project</SubmitButton>
-          </form>
-          {me.role === "admin" && (
-            <form action={deleteProject} className="mt-4 border-t border-stone-100 pt-3">
-              <input type="hidden" name="id" value={id} />
-              <button className="btn-danger">Delete project and its tasks</button>
-            </form>
+              <div><dt className="label">Description</dt><dd className="whitespace-pre-wrap text-stone-700">{p.description || "—"}</dd></div>
+            </dl>
           )}
         </section>
       </div>

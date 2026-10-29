@@ -14,7 +14,7 @@ export default async function ClientsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  await requireProfile();
+  const me = await requireProfile();
   const supabase = await createClient();
   const { data } = await supabase.from("companies").select("id, name, projects(id, status)").order("name");
   const rows = (data ?? []) as unknown as Row[];
@@ -24,10 +24,12 @@ export default async function ClientsPage({
       <PageHeader title="Clients" subtitle={`${rows.length} clients`} />
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
+      {me.role === "admin" && (
       <form action={createCompany} className="card mb-6 flex flex-wrap gap-2 p-4">
         <input name="name" required placeholder="Client name" aria-label="Client name" className="input min-w-64 flex-1" />
         <SubmitButton pendingText="Adding…">Add client</SubmitButton>
       </form>
+      )}
 
       <div className="card overflow-hidden">
         {rows.length === 0 ? (
