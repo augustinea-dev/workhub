@@ -149,7 +149,7 @@ export default async function TimePage({
                     <td className="table-cell text-stone-500">{r.note}</td>
                     <td className="table-cell text-right font-medium">{Number(r.hours).toFixed(2)}</td>
                     <td className="table-cell text-right">
-                      {(r.user_id === me.id || me.role === "admin") && (
+                      {me.role === "admin" && (
                         <form action={deleteTime}>
                           <input type="hidden" name="id" value={r.id} />
                           <input type="hidden" name="redirect_to" value={here} />

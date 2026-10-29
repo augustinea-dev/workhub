@@ -76,7 +76,7 @@ export default async function TaskPage({
                         {nameOf(people, c.author_id)}
                         <span className="ml-2 font-normal text-stone-400">{formatTimestamp(c.created_at)}</span>
                       </p>
-                      {(c.author_id === me.id || me.role === "admin") && (
+                      {me.role === "admin" && (
                         <form action={deleteComment}>
                           <input type="hidden" name="id" value={c.id} />
                           <input type="hidden" name="task_id" value={id} />
@@ -112,7 +112,7 @@ export default async function TaskPage({
                     <span className="w-14 font-medium">{Number(e.hours).toFixed(2)} h</span>
                     <span className="w-24 text-stone-500">{HOUR_TYPES.find((h) => h.value === e.hour_type)?.label}</span>
                     <span className="flex-1 truncate text-stone-500">{e.note}</span>
-                    {(e.user_id === me.id || me.role === "admin") && (
+                    {me.role === "admin" && (
                       <form action={deleteTime}>
                         <input type="hidden" name="id" value={e.id} />
                         <input type="hidden" name="redirect_to" value={here} />
@@ -187,11 +187,13 @@ export default async function TaskPage({
             <SubmitButton>Save task</SubmitButton>
             <p className="text-xs text-stone-400">Last updated {formatTimestamp(t.updated_at)}</p>
           </form>
-          <form action={deleteTask} className="mt-4 border-t border-stone-100 pt-3">
-            <input type="hidden" name="id" value={id} />
-            <input type="hidden" name="project_id" value={t.project.id} />
-            <button className="btn-danger">Delete task</button>
-          </form>
+          {me.role === "admin" && (
+            <form action={deleteTask} className="mt-4 border-t border-stone-100 pt-3">
+              <input type="hidden" name="id" value={id} />
+              <input type="hidden" name="project_id" value={t.project.id} />
+              <button className="btn-danger">Delete task</button>
+            </form>
+          )}
         </section>
       </div>
     </>

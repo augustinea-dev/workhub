@@ -9,7 +9,7 @@ The starter for Augustine Agency's in-house Workfront replacement. Phase 1 found
 | Area | What works |
 | --- | --- |
 | Sign-in | Email login links. Invite-only: nobody can sign up on their own |
-| Roles | **Admin**: manage people, delete projects, read the audit log. **Member**: everything else |
+| Roles | **Admin**: manage people, read the audit log, and delete anything (projects, tasks, comments, time). **Member**: create and edit work, but can't delete |
 | My Work | Your open tasks grouped Overdue / This week / Later / No date, with a one-click status change and your hours this week |
 | Projects | List (open or all), create, edit details, status, owner, client and dates; tasks inside each project |
 | Tasks | Title, status, assignee, due date, estimate, milestone flag, description; an update thread; time logged against the task |
@@ -20,7 +20,7 @@ The starter for Augustine Agency's in-house Workfront replacement. Phase 1 found
 | Safe saves | Every task and project carries a version number. If someone else saved first, you get a message and nothing is overwritten |
 | Audit trail | Database triggers log every create, update and delete, with who did it and when |
 
-Permissions are enforced in the database with row-level security, not only in the UI. The migration was tested against Postgres 16: members can't promote themselves, log time for others or delete projects, and stale saves are rejected.
+Permissions are enforced in the database with row-level security, not only in the UI. The migration was tested against Postgres 16: members can't promote themselves, log time for others or delete anything, and stale saves are rejected.
 
 ## Setup (about 15 minutes)
 

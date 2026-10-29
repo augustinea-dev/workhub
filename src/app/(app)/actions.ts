@@ -173,13 +173,13 @@ export async function setTaskStatus(fd: FormData) {
 }
 
 export async function deleteTask(fd: FormData) {
-  await requireProfile();
+  await requireAdmin();
   const id = str(fd, "id");
   const projectId = str(fd, "project_id");
   const supabase = await createClient();
   const { data, error } = await supabase.from("tasks").delete().eq("id", id).select("id");
   if (error) fail(`/tasks/${id}`, error.message);
-  if (!data?.length) fail(`/tasks/${id}`, "Only the person who created this task or an admin can delete it.");
+  if (!data?.length) fail(`/tasks/${id}`, "Only an admin can delete tasks.");
   done(`/projects/${projectId}`, "Task deleted.");
 }
 
@@ -197,7 +197,7 @@ export async function addComment(fd: FormData) {
 }
 
 export async function deleteComment(fd: FormData) {
-  await requireProfile();
+  await requireAdmin();
   const taskId = str(fd, "task_id");
   const supabase = await createClient();
   const { error } = await supabase.from("comments").delete().eq("id", str(fd, "id"));
@@ -235,12 +235,12 @@ export async function logTime(fd: FormData) {
 }
 
 export async function deleteTime(fd: FormData) {
-  await requireProfile();
+  await requireAdmin();
   const back = safePath(str(fd, "redirect_to"), "/time");
   const supabase = await createClient();
   const { data, error } = await supabase.from("time_entries").delete().eq("id", str(fd, "id")).select("id");
   if (error) fail(back, error.message);
-  if (!data?.length) fail(back, "You can only remove your own time.");
+  if (!data?.length) fail(back, "Only an admin can remove time entries.");
   done(back, "Time entry removed.");
 }
 
