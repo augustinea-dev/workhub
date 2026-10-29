@@ -34,12 +34,18 @@ Permissions are enforced in the database with row-level security, not only in th
    ```sql
    update public.profiles set role = 'admin' where email = 'you@augustineagency.com';
    ```
-6. **Run it locally:**
+6. **Run it locally.** Clone the repo, then copy the env file:
    ```bash
-   cp .env.example .env.local   # add the project URL and publishable key from Project Settings → API
+   git clone https://github.com/augustinea-dev/workhub.git
+   cd workhub
+   cp .env.example .env.local
+   ```
+   Open `.env.local` and paste in the Project URL and publishable key from Project Settings → API. Then run:
+   ```bash
    npm install
    npm run dev
    ```
+   Open http://localhost:3000.
 7. **Deploy.** Import the repo into Vercel and add the same two environment variables.
 
 > Supabase's built-in email is rate-limited and meant for testing. Before more people use the app, set up custom SMTP under Authentication → Emails (Microsoft 365 or Resend).
