@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { createProject } from "../actions";
 import { LiveRefresh, SubmitButton } from "@/components/client";
-import { Empty, Flash, PageHeader, ProjectBadge } from "@/components/ui";
-import { formatDate, todayISO } from "@/lib/dates";
+import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge } from "@/components/ui";
+import { formatDate, relativeDay, todayISO } from "@/lib/dates";
+import { nextMilestone } from "@/lib/milestones";
 import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import type { ProjectStatus } from "@/lib/types";
+import type { ProjectStatus, TaskStatus } from "@/lib/types";
 
 type Row = {
   id: string;
@@ -15,7 +16,14 @@ type Row = {
   due_date: string | null;
   owner_id: string | null;
   company: { name: string } | null;
-  tasks: { status: string }[];
+  tasks: {
+    id: string;
+    title: string;
+    status: TaskStatus;
+    due_date: string | null;
+    is_milestone: boolean;
+    milestone_id: string | null;
+  }[];
 };
 
 export default async function ProjectsPage({
@@ -30,7 +38,7 @@ export default async function ProjectsPage({
 
   let query = supabase
     .from("projects")
-    .select("id, name, status, due_date, owner_id, company:companies(name), tasks(status)")
+    .select("id, name, status, due_date, owner_id, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id)")
     .order("due_date", { ascending: true, nullsFirst: false });
   if (show === "open") query = query.not("status", "in", "(complete,cancelled)");
 
@@ -94,13 +102,14 @@ export default async function ProjectsPage({
         {rows.length === 0 ? (
           <Empty>No projects yet.</Empty>
         ) : (
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[820px]">
             <thead>
               <tr>
                 <th className="table-head">Project</th>
                 <th className="table-head">Client</th>
                 <th className="table-head">Owner</th>
                 <th className="table-head">Status</th>
+                <th className="table-head">Next milestone</th>
                 <th className="table-head">Open tasks</th>
                 <th className="table-head">Due</th>
               </tr>
@@ -109,6 +118,7 @@ export default async function ProjectsPage({
               {rows.map((p) => {
                 const open = p.tasks.filter((t) => t.status !== "done").length;
                 const late = p.due_date && p.due_date < today && p.status !== "complete";
+                const next = nextMilestone(p.tasks, today);
                 return (
                   <tr key={p.id} className="hover:bg-stone-50">
                     <td className="table-cell">
@@ -117,6 +127,23 @@ export default async function ProjectsPage({
                     <td className="table-cell text-stone-600">{p.company?.name ?? "—"}</td>
                     <td className="table-cell text-stone-600">{nameOf(people, p.owner_id)}</td>
                     <td className="table-cell"><ProjectBadge status={p.status} /></td>
+                    <td className="table-cell">
+                      {next ? (
+                        <div className="min-w-0">
+                          <Link href={`/tasks/${next.milestone.id}`} className="block max-w-56 truncate font-medium hover:underline">
+                            ◆ {next.milestone.title}
+                          </Link>
+                          <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                            {next.milestone.due_date
+                              ? `${formatDate(next.milestone.due_date)} (${relativeDay(next.milestone.due_date, today)})`
+                              : "No date"}
+                            <HealthBadge health={next.health} />
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-stone-400">None</span>
+                      )}
+                    </td>
                     <td className="table-cell text-stone-600">
                       {open} <span className="text-stone-400">/ {p.tasks.length}</span>
                     </td>

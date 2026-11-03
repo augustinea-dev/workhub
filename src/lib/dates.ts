@@ -57,3 +57,17 @@ export function formatTimestamp(ts: string): string {
 export function isValidISODate(v: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(parse(v).getTime());
 }
+
+/** Whole days from `from` to `to` (both YYYY-MM-DD). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((parse(to).getTime() - parse(from).getTime()) / 86_400_000);
+}
+
+/** "today", "tomorrow", "in 3 days", "yesterday", "4 days ago". */
+export function relativeDay(iso: string, today: string): string {
+  const n = daysBetween(today, iso);
+  if (n === 0) return "today";
+  if (n === 1) return "tomorrow";
+  if (n === -1) return "yesterday";
+  return n > 0 ? `in ${n} days` : `${-n} days ago`;
+}

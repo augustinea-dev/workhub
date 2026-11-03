@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteProject, updateProject } from "../../actions";
 import { LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
-import { Empty, Flash, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
-import { formatDate, todayISO } from "@/lib/dates";
+import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
+import { formatDate, relativeDay, todayISO } from "@/lib/dates";
+import { groupByMilestone } from "@/lib/milestones";
 import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -34,13 +35,47 @@ export default async function ProjectPage({
   const p = project as Project;
   const list = (tasks ?? []) as Task[];
   const open = list.filter((t) => t.status !== "done");
-  const finished = list.filter((t) => t.status === "done");
   const totalHours = (time ?? []).reduce((s, t) => s + Number(t.hours), 0);
   const billable = (time ?? []).filter((t) => t.hour_type === "billable").reduce((s, t) => s + Number(t.hours), 0);
   const company = companies.find((c) => c.id === p.company_id);
   const today = todayISO();
   const here = `/projects/${id}`;
   const activePeople = people.filter((x) => x.active);
+  const milestoneGroups = groupByMilestone(list, today);
+  const next = milestoneGroups.find((g) => g.milestone.status !== "done");
+  const byOpenFirst = (a: Task, b: Task) => Number(a.status === "done") - Number(b.status === "done");
+  const ungrouped = list.filter((t) => !t.is_milestone && !t.milestone_id).sort(byOpenFirst);
+
+  const taskRow = (t: Task, indent: boolean) => {
+    const late = t.due_date && t.due_date < today && t.status !== "done";
+    const canChange = isAdmin || t.assignee_id === me.id;
+    return (
+      <tr key={t.id} className="hover:bg-stone-50">
+        <td className={`table-cell ${indent ? "pl-8" : ""}`}>
+          <Link
+            href={`/tasks/${t.id}`}
+            className={`font-medium hover:underline ${t.status === "done" ? "text-stone-400 line-through" : ""}`}
+          >
+            {t.is_milestone && <span title="Milestone">◆ </span>}
+            {t.title}
+          </Link>
+        </td>
+        <td className={`table-cell ${t.assignee_id === me.id ? "font-medium" : "text-stone-600"}`}>
+          {t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id)}
+        </td>
+        <td className={`table-cell whitespace-nowrap ${late ? "font-medium text-red-700" : "text-stone-600"}`}>
+          {formatDate(t.due_date)}
+        </td>
+        <td className="table-cell">
+          {canChange ? (
+            <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo={here} />
+          ) : (
+            <TaskBadge status={t.status} />
+          )}
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <>
@@ -56,6 +91,19 @@ export default async function ProjectPage({
             <ProjectBadge status={p.status} />
             <span>Owner: {nameOf(people, p.owner_id)}</span>
             <span>Due {formatDate(p.due_date)}</span>
+            {next && (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <span>
+                  Next milestone:{" "}
+                  <Link href={`/tasks/${next.milestone.id}`} className="font-medium text-stone-900 hover:underline">
+                    ◆ {next.milestone.title}
+                  </Link>
+                  {next.milestone.due_date &&
+                    `, ${formatDate(next.milestone.due_date)} (${relativeDay(next.milestone.due_date, today)})`}
+                </span>
+                <HealthBadge health={next.health} />
+              </span>
+            )}
             <span>{totalHours.toFixed(1)} h logged ({billable.toFixed(1)} billable)</span>
           </span>
         }
@@ -80,38 +128,52 @@ export default async function ProjectPage({
                     <th className="table-head">Status</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {[...open, ...finished].map((t) => {
-                    const late = t.due_date && t.due_date < today && t.status !== "done";
-                    const canChange = isAdmin || t.assignee_id === me.id;
-                    return (
-                      <tr key={t.id} className="hover:bg-stone-50">
-                        <td className="table-cell">
-                          <Link
-                            href={`/tasks/${t.id}`}
-                            className={`font-medium hover:underline ${t.status === "done" ? "text-stone-400 line-through" : ""}`}
-                          >
-                            {t.is_milestone && <span title="Milestone">◆ </span>}
-                            {t.title}
-                          </Link>
+                {milestoneGroups.map((g) => {
+                  const m = g.milestone;
+                  const canChange = isAdmin || m.assignee_id === me.id;
+                  return (
+                    <tbody key={m.id}>
+                      <tr className="bg-stone-50">
+                        <td colSpan={3} className="border-b border-stone-200 px-4 py-2.5">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <Link
+                              href={`/tasks/${m.id}`}
+                              className={`text-sm font-semibold hover:underline ${m.status === "done" ? "text-stone-400 line-through" : ""}`}
+                            >
+                              ◆ {m.title}
+                            </Link>
+                            <span className="text-xs text-stone-500">
+                              {m.due_date ? `Due ${formatDate(m.due_date)}` : "No date"}
+                              {" · "}
+                              {g.tasks.length ? `${g.done} of ${g.tasks.length} done` : "No tasks yet"}
+                            </span>
+                            <HealthBadge health={g.health} showReason />
+                          </div>
                         </td>
-                        <td className={`table-cell ${t.assignee_id === me.id ? "font-medium" : "text-stone-600"}`}>
-                          {t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id)}
-                        </td>
-                        <td className={`table-cell whitespace-nowrap ${late ? "font-medium text-red-700" : "text-stone-600"}`}>
-                          {formatDate(t.due_date)}
-                        </td>
-                        <td className="table-cell">
+                        <td className="border-b border-stone-200 px-4 py-2.5">
                           {canChange ? (
-                            <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo={here} />
+                            <TaskStatusSelect id={m.id} version={m.version} status={m.status} redirectTo={here} />
                           ) : (
-                            <TaskBadge status={t.status} />
+                            <TaskBadge status={m.status} />
                           )}
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
+                      {[...g.tasks].sort(byOpenFirst).map((t) => taskRow(t, true))}
+                    </tbody>
+                  );
+                })}
+                {ungrouped.length > 0 && (
+                  <tbody>
+                    {milestoneGroups.length > 0 && (
+                      <tr className="bg-stone-50">
+                        <td colSpan={4} className="border-b border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-500">
+                          Not in a milestone
+                        </td>
+                      </tr>
+                    )}
+                    {ungrouped.map((t) => taskRow(t, milestoneGroups.length > 0))}
+                  </tbody>
+                )}
               </table>
             </div>
           )}
@@ -119,20 +181,49 @@ export default async function ProjectPage({
           {isAdmin && (
             <form action={createTask} className="border-t border-stone-200 bg-stone-50 p-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Add a task</p>
-              <div className="grid gap-2 md:grid-cols-6">
+              <div className="grid items-end gap-2 md:grid-cols-6">
                 <input type="hidden" name="project_id" value={id} />
-                <input name="title" required placeholder="Task title" aria-label="Task title" className="input md:col-span-2" />
-                <select name="assignee_id" aria-label="Assignee" className="input md:col-span-2" defaultValue="">
-                  <option value="">Assign to… (unassigned)</option>
-                  {activePeople.map((x) => (
-                    <option key={x.id} value={x.id}>{personOption(x)}</option>
-                  ))}
-                </select>
-                <input name="due_date" type="date" aria-label="Due date" className="input" />
-                <SubmitButton pendingText="Adding…">Add task</SubmitButton>
-                <label className="flex items-center gap-2 text-xs text-stone-600 md:col-span-6">
-                  <input type="checkbox" name="is_milestone" /> Milestone
+                <div className="md:col-span-2">
+                  <label className="label" htmlFor="new_task_title">Title</label>
+                  <input id="new_task_title" name="title" required placeholder="Task title" className="input w-full" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label" htmlFor="new_task_assignee">Assignee</label>
+                  <select id="new_task_assignee" name="assignee_id" className="input w-full" defaultValue="">
+                    <option value="">Unassigned</option>
+                    {activePeople.map((x) => (
+                      <option key={x.id} value={x.id}>{personOption(x)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="new_task_start">Start</label>
+                  <input id="new_task_start" name="start_date" type="date" className="input w-full" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="new_task_due">Due</label>
+                  <input id="new_task_due" name="due_date" type="date" className="input w-full" />
+                </div>
+                {milestoneGroups.length > 0 && (
+                  <div className="md:col-span-3">
+                    <label className="label" htmlFor="new_task_milestone">Milestone</label>
+                    <select id="new_task_milestone" name="milestone_id" className="input w-full" defaultValue="">
+                      <option value="">Not in a milestone</option>
+                      {milestoneGroups.map((g) => (
+                        <option key={g.milestone.id} value={g.milestone.id}>
+                          {g.milestone.title}
+                          {g.milestone.due_date ? ` (${formatDate(g.milestone.due_date)})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <label
+                  className={`flex items-center gap-2 py-2 text-xs text-stone-600 ${milestoneGroups.length > 0 ? "md:col-span-2" : "md:col-span-5"}`}
+                >
+                  <input type="checkbox" name="is_milestone" /> This task is a milestone
                 </label>
+                <SubmitButton pendingText="Adding…">Add task</SubmitButton>
               </div>
             </form>
           )}

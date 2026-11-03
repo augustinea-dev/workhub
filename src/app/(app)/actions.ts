@@ -117,13 +117,19 @@ export async function createTask(fd: FormData) {
   const back = safePath(str(fd, "redirect_to"), `/projects/${projectId}`);
   const title = str(fd, "title");
   if (!title) fail(back, "Enter a task title.");
+  const startDate = optDate(fd, "start_date");
+  const dueDate = optDate(fd, "due_date");
+  if (startDate && dueDate && startDate > dueDate) fail(back, "Start date can't be after the due date.");
+  const isMilestone = str(fd, "is_milestone") === "on";
   const supabase = await createClient();
   const { error } = await supabase.from("tasks").insert({
     project_id: projectId,
     title,
     assignee_id: opt(fd, "assignee_id"),
-    due_date: optDate(fd, "due_date"),
-    is_milestone: str(fd, "is_milestone") === "on",
+    start_date: startDate,
+    due_date: dueDate,
+    is_milestone: isMilestone,
+    milestone_id: isMilestone ? null : opt(fd, "milestone_id"),
   });
   if (error) fail(back, error.message);
   done(back, `Added “${title}”.`);
@@ -135,7 +141,11 @@ export async function updateTask(fd: FormData) {
   const path = `/tasks/${id}`;
   const title = str(fd, "title");
   if (!title) fail(path, "Task title can't be empty.");
+  const startDate = optDate(fd, "start_date");
+  const dueDate = optDate(fd, "due_date");
+  if (startDate && dueDate && startDate > dueDate) fail(path, "Start date can't be after the due date.");
   const estimate = Number.parseFloat(str(fd, "estimate_hours"));
+  const isMilestone = str(fd, "is_milestone") === "on";
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tasks")
@@ -144,9 +154,11 @@ export async function updateTask(fd: FormData) {
       description: opt(fd, "description"),
       status: oneOf(str(fd, "status"), TASK_STATUSES, "todo"),
       assignee_id: opt(fd, "assignee_id"),
-      due_date: optDate(fd, "due_date"),
+      start_date: startDate,
+      due_date: dueDate,
       estimate_hours: Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
-      is_milestone: str(fd, "is_milestone") === "on",
+      is_milestone: isMilestone,
+      milestone_id: isMilestone ? null : opt(fd, "milestone_id"),
     })
     .eq("id", id)
     .eq("version", int(fd, "version"))

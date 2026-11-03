@@ -1,3 +1,4 @@
+import type { Health } from "@/lib/milestones";
 import type { ProjectStatus, TaskStatus } from "@/lib/types";
 import { PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
 
@@ -61,4 +62,25 @@ export function PageHeader({
 
 export function Empty({ children }: { children: React.ReactNode }) {
   return <p className="px-4 py-8 text-center text-sm text-stone-500">{children}</p>;
+}
+
+export function Bar({ className }: { className: string }) {
+  return <div className={`rounded-md bg-stone-200/70 ${className}`} />;
+}
+
+const HEALTH: Record<Health["state"], { label: string; tone: string }> = {
+  on_track: { label: "On track", tone: "bg-emerald-50 text-emerald-800" },
+  at_risk: { label: "At risk", tone: "bg-amber-50 text-amber-800" },
+  late: { label: "Late", tone: "bg-red-50 text-red-800" },
+  done: { label: "Done", tone: "bg-stone-100 text-stone-600" },
+};
+
+export function HealthBadge({ health, showReason }: { health: Health; showReason?: boolean }) {
+  const h = HEALTH[health.state];
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span title={health.reason} className={`rounded-full px-2 py-0.5 text-xs font-medium ${h.tone}`}>{h.label}</span>
+      {showReason && health.reason && <span className="text-xs text-stone-500">{health.reason}</span>}
+    </span>
+  );
 }

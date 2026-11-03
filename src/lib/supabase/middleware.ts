@@ -23,9 +23,8 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Refreshes the session cookie; must run before any redirect decision.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims.sub;
 
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));

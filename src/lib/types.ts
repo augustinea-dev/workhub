@@ -35,9 +35,15 @@ export type Task = {
   assignee_id: string | null;
   status: TaskStatus;
   is_milestone: boolean;
+  parent_task_id: string | null;
+  milestone_id: string | null;
+  start_date: string | null;
   due_date: string | null;
   estimate_hours: number | null;
+  completed_at: string | null;
   version: number;
+  created_by: string | null;
+  created_at: string;
   updated_at: string;
 };
 
