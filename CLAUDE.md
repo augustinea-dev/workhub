@@ -1,9 +1,20 @@
 # Workhub
 
-In-house replacement for Adobe Workfront at Augustine Agency (a 30–40 person digital marketing agency on Microsoft 365). Built in phases; this repo is the Phase 1 (MVP) foundation. Staff only: there is no client access.
+Custom work hub for Augustine Agency (a digital marketing agency on Microsoft 365), replacing Adobe Workfront. Built in phases; this repo is the Phase 1 (MVP) foundation. Staff only: there is no client access.
 
 - Roadmap and Build progress tracker (status of all 66 Workfront features): https://claude.ai/artifact/3ATMWfRGDBKsvEL91cBRFH
 - Supabase project: `workhub` (ref `btixhcfjtmukefyjzfgx`, us-east-2, Free plan)
+
+## Product direction
+
+- Workhub is a custom hub for Augustine, not a feature-for-feature Workfront clone. Prioritize agency-specific value:
+  - Low-friction time capture
+  - Request-to-profit: job numbers, rates, retainers
+  - One home for our internal tools (Media & Budget Tracker alerts, website status sheets, Visioneer Time)
+  - Microsoft 365 integration
+  - AI on our own data
+- Target scale: about 40 users, 2 developers. No per-user costs: pick tools and services that don't charge per seat.
+- Files (later phase, not now): working files live in Dropbox (Dropbox Enterprise). Workhub will store links to Dropbox files and auto-create project folders; proofing will use Dropbox Replay first. Until then, **do not build file uploads or Supabase file storage.** People paste Dropbox links in task comments.
 
 ## Stack
 
@@ -38,7 +49,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
@@ -52,6 +63,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 - Person pickers use `personOption()` (name + email), because names default to the email prefix and can look alike.
 - Forms post to server actions and redirect with `?error=` / `?notice=`, rendered by `<Flash>`.
 - Pages that others can change include `<LiveRefresh subs={…}>` for Realtime refresh.
+- Milestones are tasks with `is_milestone`; other tasks join one through `milestone_id` (same project, enforced by trigger). Health (on track / at risk / late) is computed in `src/lib/milestones.ts`.
 
 ## Commands
 
@@ -63,6 +75,6 @@ npm run lint
 
 ## Next up (MVP)
 
-Email notifications, @mentions, Kanban board, subtasks UI, list sorting/filters, project templates, timesheet submit/approve, file attachments, CSV/Excel export, custom fields, teams/groups, Microsoft (Entra ID) sign-in. Update the Build progress tracker as features land.
+Email notifications, @mentions, Kanban board, subtasks UI, list sorting/filters, project templates, timesheet submit/approve, CSV/Excel export, custom fields, teams/groups, Microsoft (Entra ID) sign-in, Dropbox integration (later phase). Update the Build progress tracker as features land.
 
 Open question: should members be able to mark tasks complete when they aren't assigned to them? Currently assigned-only.
