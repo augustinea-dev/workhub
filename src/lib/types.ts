@@ -53,6 +53,7 @@ export type Comment = {
   task_id: string;
   author_id: string;
   body: string;
+  mentions: string[];
   created_at: string;
 };
 

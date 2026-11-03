@@ -30,13 +30,16 @@ export default async function InboxPage() {
       </PageHeader>
       <div className="card overflow-hidden">
         {items.length === 0 ? (
-          <Empty>You&apos;ll see assignments and new comments here.</Empty>
+          <Empty>You&apos;ll see assignments, mentions and new comments here.</Empty>
         ) : (
           <ul>
             {items.map((n) => (
               <li key={n.id} className={`flex items-center gap-3 border-b border-stone-100 px-4 py-3 ${n.read_at ? "" : "bg-blue-50/50"}`}>
                 <span className={`h-2 w-2 shrink-0 rounded-full ${n.read_at ? "bg-transparent" : "bg-blue-700"}`} />
-                <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  {n.kind === "mention" && (
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900">Mention</span>
+                  )}
                   {n.task_id ? (
                     <a href={`/inbox/open/${n.id}`} className={`text-sm hover:underline ${n.read_at ? "" : "font-semibold"}`}>{n.summary}</a>
                   ) : (

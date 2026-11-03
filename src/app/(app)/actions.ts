@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireProfile } from "@/lib/session";
+import { getPeople } from "@/lib/data";
 import { isValidISODate } from "@/lib/dates";
 import { HOUR_TYPES, PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
 
@@ -225,8 +226,13 @@ export async function addComment(fd: FormData) {
   const path = `/tasks/${taskId}`;
   const body = str(fd, "body");
   if (!body) fail(path, "Write a comment first.");
+  const people = await getPeople();
+  const mentions = [...new Set(fd.getAll("mention").map(String))].filter((id) => {
+    const p = people.find((x) => x.id === id);
+    return p && p.active && p.id !== me.id && body.includes(`@${p.full_name}`);
+  });
   const supabase = await createClient();
-  const { error } = await supabase.from("comments").insert({ task_id: taskId, body, author_id: me.id });
+  const { error } = await supabase.from("comments").insert({ task_id: taskId, body, author_id: me.id, mentions });
   if (error) fail(path, error.message);
   done(path);
 }

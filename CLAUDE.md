@@ -49,7 +49,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
@@ -57,7 +57,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 ## Conventions
 
 - Saves are version-checked: projects and tasks have a `version` column bumped by trigger. Updates use `.eq("version", v)`, and 0 rows means someone else saved first, so show the conflict message and never overwrite silently.
-- Comments are append-only (no update policy).
+- Comments are append-only (no update policy). `comments.mentions` holds the people @mentioned; a trigger keeps only active people other than the author, and they get a `mention` notification instead of `task_comment`.
 - Notifications are rows in `notification_events`, created by DB triggers. The in-app inbox reads them now; a future email worker will send rows where `emailed_at` is null.
 - Opening a notification (`/inbox/open/[id]`) or its task marks it read.
 - Person pickers use `personOption()` (name + email), because names default to the email prefix and can look alike.

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addComment, deleteComment, deleteTask, logTime, setTaskStatus, updateTask } from "../../actions";
+import { deleteComment, deleteTask, logTime, setTaskStatus, updateTask } from "../../actions";
 import { LiveRefresh, SubmitButton } from "@/components/client";
+import { MentionComposer } from "@/components/mention-composer";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, HealthBadge, TaskBadge } from "@/components/ui";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
@@ -51,6 +52,23 @@ function InfoCard({ title, children }: { title: string; children: React.ReactNod
       <h2 className="mb-3 text-sm font-semibold">{title}</h2>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</dl>
     </section>
+  );
+}
+
+function withMentions(body: string, names: string[], myName: string): React.ReactNode {
+  if (!names.length) return body;
+  const pattern = [...names].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return body.split(new RegExp(`(@(?:${pattern.join("|")}))`, "g")).map((part, i) =>
+    i % 2 ? (
+      <span
+        key={i}
+        className={`rounded px-0.5 font-medium ${part === `@${myName}` ? "bg-blue-100 text-blue-900" : "text-blue-800"}`}
+      >
+        {part}
+      </span>
+    ) : (
+      part
+    ),
   );
 }
 
@@ -279,16 +297,24 @@ export default async function TaskPage({
                         </form>
                       )}
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-stone-800">{c.body}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-stone-800">
+                      {withMentions(
+                        c.body,
+                        (c.mentions ?? []).map((m) => people.find((x) => x.id === m)?.full_name).filter((n): n is string => !!n),
+                        me.full_name,
+                      )}
+                    </p>
                   </li>
                 ))}
               </ul>
             )}
-            <form action={addComment} className="space-y-2 p-4">
-              <input type="hidden" name="task_id" value={id} />
-              <textarea name="body" required rows={3} placeholder="Post a progress note, question or handoff…" aria-label="Update" className="input w-full" />
-              <SubmitButton pendingText="Posting…">Post update</SubmitButton>
-            </form>
+            <MentionComposer
+              key={thread.length}
+              taskId={id}
+              people={people
+                .filter((x) => x.active && x.id !== me.id)
+                .map((x) => ({ id: x.id, name: x.full_name, email: x.email }))}
+            />
           </section>
 
           <section className="card">
