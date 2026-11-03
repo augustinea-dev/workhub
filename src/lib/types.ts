@@ -40,6 +40,7 @@ export type Task = {
   start_date: string | null;
   due_date: string | null;
   estimate_hours: number | null;
+  sort_order: number;
   completed_at: string | null;
   version: number;
   created_by: string | null;

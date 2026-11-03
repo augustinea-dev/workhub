@@ -7,6 +7,7 @@ import { Empty, Flash, HealthBadge, TaskBadge } from "@/components/ui";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
 import { getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { groupByMilestone } from "@/lib/milestones";
+import { canChangeStatus } from "@/lib/permissions";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { HOUR_TYPES, TASK_STATUSES, type Comment, type Profile, type Task, type TaskStatus, type TimeEntry } from "@/lib/types";
@@ -170,7 +171,7 @@ export default async function TaskPage({
       </p>
       <Flash error={sp(query.error)} notice={sp(query.notice)} />
 
-      {!isAdmin && isAssignee && (
+      {!isAdmin && canChangeStatus(me, t) && (
         <section className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <h2 className="text-sm font-semibold">Your status</h2>
@@ -201,7 +202,7 @@ export default async function TaskPage({
         </section>
       )}
 
-      {!isAdmin && !isAssignee && (
+      {!isAdmin && !canChangeStatus(me, t) && (
         <p className="mb-6 rounded-md border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
           {t.assignee_id
             ? `This task is assigned to ${assigneeName}. You can post updates and log time; ${assigneeName} or an admin can change its status.`

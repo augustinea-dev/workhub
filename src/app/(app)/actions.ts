@@ -189,6 +189,24 @@ export async function setTaskStatus(fd: FormData) {
   done(back);
 }
 
+/** Board move: same rules as setTaskStatus, but returns a result so the card can snap back. */
+export async function moveTask(id: string, version: number, status: string): Promise<{ error?: string }> {
+  await requireProfile();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({ status: oneOf(status, TASK_STATUSES, "todo") })
+    .eq("id", id)
+    .eq("version", version)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) {
+    return { error: "That task was just changed by someone else, or isn't assigned to you. The board is refreshed, try again." };
+  }
+  revalidatePath("/", "layout");
+  return {};
+}
+
 export async function deleteTask(fd: FormData) {
   await requireAdmin();
   const id = str(fd, "id");

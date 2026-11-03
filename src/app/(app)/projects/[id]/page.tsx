@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteProject, updateProject } from "../../actions";
+import { Board, type BoardCard } from "@/components/board";
 import { LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import { groupByMilestone } from "@/lib/milestones";
+import { canChangeStatus } from "@/lib/permissions";
 import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -26,7 +28,7 @@ export default async function ProjectPage({
   const [{ data: project }, { data: tasks }, { data: time }, people, companies] = await Promise.all([
     supabase.from("projects").select("*").eq("id", id).maybeSingle(),
     supabase.from("tasks").select("*").eq("project_id", id).order("sort_order"),
-    supabase.from("time_entries").select("hours, hour_type").eq("project_id", id),
+    supabase.from("time_entries").select("task_id, hours, hour_type").eq("project_id", id),
     getPeople(),
     getCompanies(),
   ]);
@@ -46,9 +48,59 @@ export default async function ProjectPage({
   const byOpenFirst = (a: Task, b: Task) => Number(a.status === "done") - Number(b.status === "done");
   const ungrouped = list.filter((t) => !t.is_milestone && !t.milestone_id).sort(byOpenFirst);
 
+  const view = sp(query.view) === "board" ? "board" : "list";
+  const who = sp(query.who) === "mine" ? "mine" : "all";
+  const msFilter = sp(query.milestone);
+  const viewHref = (next: { view?: string; who?: string; milestone?: string | null }) => {
+    const qs = new URLSearchParams();
+    const v = next.view ?? view;
+    if (v === "board") qs.set("view", "board");
+    if (v === "board") {
+      const w = next.who ?? who;
+      const m = next.milestone === undefined ? msFilter : next.milestone;
+      if (w === "mine") qs.set("who", "mine");
+      if (m) qs.set("milestone", m);
+    }
+    const s = qs.toString();
+    return s ? `${here}?${s}` : here;
+  };
+  const loggedByTask = new Map<string, number>();
+  for (const e of time ?? []) {
+    if (e.task_id) loggedByTask.set(e.task_id, (loggedByTask.get(e.task_id) ?? 0) + Number(e.hours));
+  }
+  const milestoneTitle = new Map(milestoneGroups.map((g) => [g.milestone.id, g.milestone.title]));
+  const byDue = (a: Task, b: Task) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999") || a.sort_order - b.sort_order;
+  const byFinished = (a: Task, b: Task) => (b.completed_at ?? "").localeCompare(a.completed_at ?? "");
+  const boardCards: BoardCard[] = list
+    .filter((t) => who === "all" || t.assignee_id === me.id)
+    .filter((t) =>
+      !msFilter ? true : msFilter === "none" ? !t.is_milestone && !t.milestone_id : t.milestone_id === msFilter || t.id === msFilter,
+    )
+    .sort((a, b) => (a.status === "done" && b.status === "done" ? byFinished(a, b) : byDue(a, b)))
+    .map((t) => {
+      const logged = loggedByTask.get(t.id) ?? 0;
+      const est = t.estimate_hours != null ? Number(t.estimate_hours) : null;
+      return {
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        version: t.version,
+        isMilestone: t.is_milestone,
+        milestone: t.milestone_id ? milestoneTitle.get(t.milestone_id) ?? null : null,
+        assignee: t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id),
+        isMine: t.assignee_id === me.id,
+        due: t.due_date ? formatDate(t.due_date) : null,
+        late: !!t.due_date && t.due_date < today && t.status !== "done",
+        hours: est != null ? `${+logged.toFixed(2)} / ${+est.toFixed(2)} h` : logged ? `${+logged.toFixed(2)} h` : null,
+        canMove: canChangeStatus(me, t),
+      };
+    });
+  const chip = (active: boolean) =>
+    `rounded-full px-3 py-1 text-xs font-medium ${active ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`;
+
   const taskRow = (t: Task, indent: boolean) => {
     const late = t.due_date && t.due_date < today && t.status !== "done";
-    const canChange = isAdmin || t.assignee_id === me.id;
+    const canChange = canChangeStatus(me, t);
     return (
       <tr key={t.id} className="hover:bg-stone-50">
         <td className={`table-cell ${indent ? "pl-8" : ""}`}>
@@ -110,13 +162,47 @@ export default async function ProjectPage({
       />
       <Flash error={sp(query.error)} notice={sp(query.notice)} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="card overflow-hidden lg:col-span-2">
-          <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
-            Tasks <span className="font-normal text-stone-400">· {open.length} open</span>
-          </h2>
+      <div className={view === "board" ? "space-y-6" : "grid gap-6 lg:grid-cols-3"}>
+        <section className={`card overflow-hidden ${view === "board" ? "" : "lg:col-span-2"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5">
+            <h2 className="text-sm font-semibold">
+              Tasks <span className="font-normal text-stone-400">· {open.length} open</span>
+            </h2>
+            <nav aria-label="Task view" className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5 text-xs font-medium">
+              {(["list", "board"] as const).map((v) => (
+                <Link
+                  key={v}
+                  href={viewHref({ view: v })}
+                  aria-current={view === v ? "page" : undefined}
+                  className={`rounded-md px-3 py-1 ${view === v ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"}`}
+                >
+                  {v === "list" ? "List" : "Board"}
+                </Link>
+              ))}
+            </nav>
+          </div>
           {list.length === 0 ? (
             <Empty>No tasks yet.{isAdmin && " Add the first one below."}</Empty>
+          ) : view === "board" ? (
+            <div className="p-4">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Link href={viewHref({ who: "all" })} className={chip(who === "all")}>Everyone</Link>
+                <Link href={viewHref({ who: "mine" })} className={chip(who === "mine")}>Mine</Link>
+                {milestoneGroups.length > 0 && (
+                  <>
+                    <span className="mx-1 h-4 w-px bg-stone-200" aria-hidden="true" />
+                    <Link href={viewHref({ milestone: null })} className={chip(!msFilter)}>All milestones</Link>
+                    {milestoneGroups.map((g) => (
+                      <Link key={g.milestone.id} href={viewHref({ milestone: g.milestone.id })} className={chip(msFilter === g.milestone.id)}>
+                        ◆ {g.milestone.title}
+                      </Link>
+                    ))}
+                    <Link href={viewHref({ milestone: "none" })} className={chip(msFilter === "none")}>No milestone</Link>
+                  </>
+                )}
+              </div>
+              <Board key={`${who}-${msFilter ?? ""}`} cards={boardCards} />
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px]">
@@ -130,7 +216,7 @@ export default async function ProjectPage({
                 </thead>
                 {milestoneGroups.map((g) => {
                   const m = g.milestone;
-                  const canChange = isAdmin || m.assignee_id === me.id;
+                  const canChange = canChangeStatus(me, m);
                   return (
                     <tbody key={m.id}>
                       <tr className="bg-stone-50">
