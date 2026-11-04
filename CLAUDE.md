@@ -44,12 +44,13 @@ src/lib/                    supabase clients, session (requireProfile / requireA
 | Edit / remove time entries | Anyone's | Own only |
 | Delete projects, tasks, comments, clients | ✓ | ✗ |
 | Admin page, audit log, other people's timesheets | ✓ | ✗ |
+| Project templates (view, create, edit, delete, use, save project as template) | ✓ | ✗ |
 
 When adding a feature, decide its admin/member rule first. Enforce it with an RLS policy or trigger in a new migration, check it in the server action (`requireAdmin()` / `requireProfile()`), and hide controls the person can't use.
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
@@ -63,6 +64,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 - Person pickers use `personOption()` (name + email), because names default to the email prefix and can look alike.
 - Forms post to server actions and redirect with `?error=` / `?notice=`, rendered by `<Flash>`.
 - Pages that others can change include `<LiveRefresh subs={…}>` for Realtime refresh.
+- Templates (`project_templates`, `template_tasks`) store days as working days from the project start (Mon to Fri; `add_working_days()` in SQL and `addWorkingDays()` in `dates.ts` must match, and holidays would go in both). Projects are created from templates, and saved as templates, by the database functions `create_project_from_template()` and `create_template_from_project()` in one transaction.
 - Milestones are tasks with `is_milestone`; other tasks join one through `milestone_id` (same project, enforced by trigger). Health (on track / at risk / late) is computed in `src/lib/milestones.ts`.
 
 ## Commands

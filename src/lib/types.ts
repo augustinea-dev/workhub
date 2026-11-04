@@ -100,3 +100,26 @@ export const HOUR_TYPES: { value: HourType; label: string }[] = [
   { value: "meeting", label: "Meeting" },
   { value: "pto", label: "PTO" },
 ];
+
+export type ProjectTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  version: number;
+  updated_at: string;
+};
+
+export type TemplateTask = {
+  id: string;
+  template_id: string;
+  title: string;
+  description: string | null;
+  start_day: number;
+  due_day: number;
+  estimate_hours: number | null;
+  is_milestone: boolean;
+  milestone_id: string | null;
+  assignee_id: string | null;
+  sort_order: number;
+  version: number;
+};

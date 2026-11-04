@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createTask, deleteProject, updateProject } from "../../actions";
+import { createTask, deleteProject, saveProjectAsTemplate, updateProject } from "../../actions";
 import { Board, type BoardCard } from "@/components/board";
 import { LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
@@ -369,6 +369,15 @@ export default async function ProjectPage({
                   <textarea id="description" name="description" rows={4} defaultValue={p.description ?? ""} className="input w-full" />
                 </div>
                 <SubmitButton>Save project</SubmitButton>
+              </form>
+              <form action={saveProjectAsTemplate} className="mt-4 space-y-2 border-t border-stone-100 pt-3">
+                <input type="hidden" name="project_id" value={id} />
+                <label className="label" htmlFor="template_name">Save as template</label>
+                <div className="flex gap-2">
+                  <input id="template_name" name="name" required defaultValue={`${p.name} template`} className="input min-w-0 flex-1" />
+                  <SubmitButton className="btn" pendingText="Saving…">Save</SubmitButton>
+                </div>
+                <p className="text-xs text-stone-500">Copies tasks, milestones, estimates and assignees. Days are counted from the project start.</p>
               </form>
               <form action={deleteProject} className="mt-4 border-t border-stone-100 pt-3">
                 <input type="hidden" name="id" value={id} />

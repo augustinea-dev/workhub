@@ -60,6 +60,7 @@ export async function createProject(fd: FormData) {
   const me = await requireAdmin();
   const name = str(fd, "name");
   if (!name) fail("/projects", "Enter a project name.");
+  if (str(fd, "template_id")) return createProjectFromTemplate(fd, me.id);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
@@ -67,6 +68,7 @@ export async function createProject(fd: FormData) {
       name,
       company_id: opt(fd, "company_id"),
       owner_id: opt(fd, "owner_id") ?? me.id,
+      start_date: optDate(fd, "start_date"),
       due_date: optDate(fd, "due_date"),
       status: "active",
     })
@@ -74,6 +76,34 @@ export async function createProject(fd: FormData) {
     .single();
   if (error || !data) fail("/projects", error?.message ?? "Couldn't create the project.");
   done(`/projects/${data.id}`, "Project created.");
+}
+
+async function createProjectFromTemplate(fd: FormData, ownerFallback: string) {
+  const name = str(fd, "name");
+  const start = optDate(fd, "start_date");
+  if (!start) fail("/projects", "Pick a start date so the template's task dates can be worked out.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_project_from_template", {
+    p_template: str(fd, "template_id"),
+    p_name: name,
+    p_company: opt(fd, "company_id"),
+    p_owner: opt(fd, "owner_id") ?? ownerFallback,
+    p_start: start,
+    p_due: optDate(fd, "due_date"),
+  });
+  if (error || !data) fail("/projects", error?.message ?? "Couldn't create the project.");
+  done(`/projects/${data}`, "Project created from the template.");
+}
+
+export async function saveProjectAsTemplate(fd: FormData) {
+  await requireAdmin();
+  const projectId = str(fd, "project_id");
+  const name = str(fd, "name");
+  if (!name) fail(`/projects/${projectId}`, "Give the template a name.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_template_from_project", { p_project: projectId, p_name: name });
+  if (error || !data) fail(`/projects/${projectId}`, error?.message ?? "Couldn't save the template.");
+  done(`/templates/${data}`, "Template saved. Check the days and assignees below.");
 }
 
 export async function updateProject(fd: FormData) {
@@ -217,6 +247,104 @@ export async function deleteTask(fd: FormData) {
   if (error) fail(`/tasks/${id}`, error.message);
   if (!data?.length) fail(`/tasks/${id}`, "Only an admin can delete tasks.");
   done(`/projects/${projectId}`, "Task deleted.");
+}
+
+// ---------- templates (admin) ----------
+function templateTaskFields(fd: FormData, back: string) {
+  const title = str(fd, "title");
+  if (!title) fail(back, "Enter a task title.");
+  const startDay = int(fd, "start_day");
+  const dueDay = int(fd, "due_day");
+  if (!Number.isInteger(startDay) || startDay < 0) fail(back, "Start day must be 0 or more.");
+  if (!Number.isInteger(dueDay) || dueDay < startDay) fail(back, "Due day can't be before the start day.");
+  const estimate = Number.parseFloat(str(fd, "estimate_hours"));
+  const kind = str(fd, "kind");
+  return {
+    title,
+    description: opt(fd, "description"),
+    start_day: startDay,
+    due_day: dueDay,
+    estimate_hours: Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
+    is_milestone: kind === "milestone",
+    milestone_id: kind.startsWith("in:") ? kind.slice(3) : null,
+    assignee_id: opt(fd, "assignee_id"),
+  };
+}
+
+export async function createTemplate(fd: FormData) {
+  await requireAdmin();
+  const name = str(fd, "name");
+  if (!name) fail("/templates", "Give the template a name.");
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_templates")
+    .insert({ name, description: opt(fd, "description") })
+    .select("id")
+    .single();
+  if (error || !data) fail("/templates", error?.message ?? "Couldn't create the template.");
+  done(`/templates/${data.id}`, "Template created. Add its tasks below.");
+}
+
+export async function updateTemplate(fd: FormData) {
+  await requireAdmin();
+  const id = str(fd, "id");
+  const back = `/templates/${id}`;
+  const name = str(fd, "name");
+  if (!name) fail(back, "Template name can't be empty.");
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_templates")
+    .update({ name, description: opt(fd, "description") })
+    .eq("id", id)
+    .eq("version", int(fd, "version"))
+    .select("id");
+  if (error) fail(back, error.message);
+  if (!data?.length) fail(back, CONFLICT);
+  done(back, "Template saved.");
+}
+
+export async function deleteTemplate(fd: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("project_templates").delete().eq("id", str(fd, "id"));
+  if (error) fail(`/templates/${str(fd, "id")}`, error.message);
+  done("/templates", "Template deleted. Projects already created from it are unchanged.");
+}
+
+export async function createTemplateTask(fd: FormData) {
+  await requireAdmin();
+  const templateId = str(fd, "template_id");
+  const back = `/templates/${templateId}`;
+  const fields = templateTaskFields(fd, back);
+  const supabase = await createClient();
+  const { error } = await supabase.from("template_tasks").insert({ template_id: templateId, ...fields });
+  if (error) fail(back, error.message);
+  done(back, `Added “${fields.title}”.`);
+}
+
+export async function updateTemplateTask(fd: FormData) {
+  await requireAdmin();
+  const back = `/templates/${str(fd, "template_id")}`;
+  const fields = templateTaskFields(fd, back);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("template_tasks")
+    .update(fields)
+    .eq("id", str(fd, "id"))
+    .eq("version", int(fd, "version"))
+    .select("id");
+  if (error) fail(back, error.message);
+  if (!data?.length) fail(back, CONFLICT);
+  done(back, `Saved “${fields.title}”.`);
+}
+
+export async function deleteTemplateTask(fd: FormData) {
+  await requireAdmin();
+  const back = `/templates/${str(fd, "template_id")}`;
+  const supabase = await createClient();
+  const { error } = await supabase.from("template_tasks").delete().eq("id", str(fd, "id"));
+  if (error) fail(back, error.message);
+  done(back, "Task removed from the template.");
 }
 
 // ---------- comments ----------

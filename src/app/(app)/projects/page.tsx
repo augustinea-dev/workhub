@@ -42,7 +42,15 @@ export default async function ProjectsPage({
     .order("due_date", { ascending: true, nullsFirst: false });
   if (show === "open") query = query.not("status", "in", "(complete,cancelled)");
 
-  const [{ data }, people, companies] = await Promise.all([query, getPeople(), getCompanies()]);
+  const [{ data }, people, companies, { data: templateData }] = await Promise.all([
+    query,
+    getPeople(),
+    getCompanies(),
+    me.role === "admin"
+      ? supabase.from("project_templates").select("id, name").order("name")
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const templates = templateData ?? [];
   const rows = (data ?? []) as unknown as Row[];
   const today = todayISO();
 
@@ -60,7 +68,7 @@ export default async function ProjectsPage({
       {me.role === "admin" && (
       <details className="card mb-6 p-4" open={rows.length === 0}>
         <summary className="cursor-pointer text-sm font-semibold">+ New project</summary>
-        <form action={createProject} className="mt-4 grid gap-3 md:grid-cols-5">
+        <form action={createProject} className="mt-4 grid gap-3 md:grid-cols-6">
           <div className="md:col-span-2">
             <label className="label" htmlFor="name">Name</label>
             <input id="name" name="name" required className="input w-full" placeholder="Homepage refresh" />
@@ -83,10 +91,28 @@ export default async function ProjectsPage({
             </select>
           </div>
           <div>
+            <label className="label" htmlFor="start_date">Start</label>
+            <input id="start_date" name="start_date" type="date" className="input w-full" />
+          </div>
+          <div>
             <label className="label" htmlFor="due_date">Due</label>
             <input id="due_date" name="due_date" type="date" className="input w-full" />
           </div>
-          <div className="md:col-span-5">
+          {templates.length > 0 && (
+            <div className="md:col-span-3">
+              <label className="label" htmlFor="template_id">Start from template</label>
+              <select id="template_id" name="template_id" className="input w-full" defaultValue="">
+                <option value="">Blank project</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-stone-500">
+                Needs a start date. Leave Due empty to use the template&apos;s length.
+              </p>
+            </div>
+          )}
+          <div className="md:col-span-6">
             <SubmitButton pendingText="Creating…">Create project</SubmitButton>
             {companies.length === 0 && (
               <span className="ml-3 text-xs text-stone-500">
