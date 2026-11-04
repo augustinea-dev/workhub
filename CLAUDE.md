@@ -53,7 +53,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
@@ -68,6 +68,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 - Forms post to server actions and redirect with `?error=` / `?notice=`, rendered by `<Flash>`.
 - Pages that others can change include `<LiveRefresh subs={…}>` for Realtime refresh.
 - Templates (`project_templates`, `template_tasks`) store days as working days from the project start (Mon to Fri; `add_working_days()` in SQL and `addWorkingDays()` in `dates.ts` must match, and holidays would go in both). Projects are created from templates, and saved as templates, by the database functions `create_project_from_template()` and `create_template_from_project()` in one transaction.
+- Project names are built by trigger `build_project_name` as `reference_number_billing year_name on project_title_project type` (e.g. `973623_2026_The Lanes_Website_TA`, matching the Workfront convention). New projects take `workhub_settings.next_reference_number`; Workfront imports keep their number and set `name_locked`. `src/lib/naming.ts` mirrors the rules for the live preview and must stay in step. Clients are the legal billing entity and hold `project_label` (brand) and `fiscal_year_start_month`. Project types (TA, TB, HC, Monthly, Initial) live in `project_types`.
 - Subtasks: `tasks.parent_task_id`, same project, one level deep (trigger `check_task_parent`; relax it there to allow more levels). A parent's start, due and estimate are rolled up from its subtasks by `apply_subtask_rollup` / `refresh_parent_rollup`, per field, only when at least one subtask has that value. Admin-only to create, like all tasks.
 - Timesheets: one row per person per Monday week in `timesheets`, changed only through `submit_timesheet()`, `recall_timesheet()`, `decide_timesheet()` and `reopen_timesheet()` (no direct write policies). A week can't be submitted below the person's `profiles.weekly_hours` (PTO counts). Trigger `guard_locked_week` blocks time entry changes in submitted or approved weeks for everyone.
 - `docs/roles-guide.md` lists what Admins and Users can do, feature by feature, in plain language for the future onboarding doc. Update it whenever a feature lands or a permission changes.

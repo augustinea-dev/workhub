@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createProject } from "../actions";
 import { FilterForm, LiveRefresh, SubmitButton } from "@/components/client";
+import { ProjectNameFields } from "@/components/project-name-fields";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge } from "@/components/ui";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import {
@@ -11,7 +12,7 @@ import {
   type ProjectSort,
 } from "@/lib/list-filters";
 import { nextMilestone } from "@/lib/milestones";
-import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
+import { getCompanies, getNextReference, getPeople, getProjectTypes, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { PROJECT_STATUSES, type ProjectStatus, type TaskStatus } from "@/lib/types";
@@ -23,6 +24,7 @@ type Row = {
   due_date: string | null;
   owner_id: string | null;
   company_id: string | null;
+  project_type: string | null;
   company: { name: string } | null;
   tasks: {
     id: string;
@@ -46,15 +48,17 @@ export default async function ProjectsPage({
 
   const query = supabase
     .from("projects")
-    .select("id, name, status, due_date, owner_id, company_id, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id)");
+    .select("id, name, status, due_date, owner_id, company_id, project_type, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id)");
 
-  const [{ data }, people, companies, { data: templateData }] = await Promise.all([
+  const [{ data }, people, companies, { data: templateData }, projectTypes, nextReference] = await Promise.all([
     query,
     getPeople(),
     getCompanies(),
     me.role === "admin"
       ? supabase.from("project_templates").select("id, name").order("name")
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    getProjectTypes(),
+    getNextReference(),
   ]);
   const templates = templateData ?? [];
   const today = todayISO();
@@ -86,51 +90,47 @@ export default async function ProjectsPage({
       {me.role === "admin" && (
       <details className="card mb-6 p-4" open={rows.length === 0}>
         <summary className="cursor-pointer text-sm font-semibold">+ New project</summary>
-        <form action={createProject} className="mt-4 grid gap-3 md:grid-cols-6">
-          <div className="md:col-span-2">
-            <label className="label" htmlFor="name">Name</label>
-            <input id="name" name="name" required className="input w-full" placeholder="Homepage refresh" />
-          </div>
-          <div>
-            <label className="label" htmlFor="company_id">Client</label>
-            <select id="company_id" name="company_id" className="input w-full" defaultValue="">
-              <option value="">— None —</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="owner_id">Owner</label>
-            <select id="owner_id" name="owner_id" className="input w-full" defaultValue={me.id}>
-              {people.filter((p) => p.active).map((p) => (
-                <option key={p.id} value={p.id}>{personOption(p)}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="start_date">Start</label>
-            <input id="start_date" name="start_date" type="date" className="input w-full" />
-          </div>
-          <div>
-            <label className="label" htmlFor="due_date">Due</label>
-            <input id="due_date" name="due_date" type="date" className="input w-full" />
-          </div>
-          {templates.length > 0 && (
-            <div className="md:col-span-3">
-              <label className="label" htmlFor="template_id">Start from template</label>
-              <select id="template_id" name="template_id" className="input w-full" defaultValue="">
-                <option value="">Blank project</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+        <form action={createProject} className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <ProjectNameFields
+            clients={companies}
+            types={projectTypes.filter((t) => t.active)}
+            reference={nextReference}
+            today={today}
+            idPrefix="new"
+          />
+          <div className="grid content-start gap-3">
+            <div>
+              <label className="label" htmlFor="owner_id">Owner</label>
+              <select id="owner_id" name="owner_id" className="input w-full" defaultValue={me.id}>
+                {people.filter((p) => p.active).map((p) => (
+                  <option key={p.id} value={p.id}>{personOption(p)}</option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-stone-500">
-                Needs a start date. Leave Due empty to use the template&apos;s length.
-              </p>
             </div>
-          )}
-          <div className="md:col-span-6">
+            <div>
+              <label className="label" htmlFor="due_date">Due</label>
+              <input id="due_date" name="due_date" type="date" className="input w-full" />
+            </div>
+            <div>
+              <label className="label" htmlFor="cost_code">Cost code</label>
+              <input id="cost_code" name="cost_code" placeholder="Optional, e.g. 2020" className="input w-full" />
+            </div>
+            {templates.length > 0 && (
+              <div>
+                <label className="label" htmlFor="template_id">Start from template</label>
+                <select id="template_id" name="template_id" className="input w-full" defaultValue="">
+                  <option value="">Blank project</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-stone-500">
+                  Needs a start date. Leave Due empty to use the template&apos;s length.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="lg:col-span-2">
             <SubmitButton pendingText="Creating…">Create project</SubmitButton>
             {companies.length === 0 && (
               <span className="ml-3 text-xs text-stone-500">
@@ -179,8 +179,18 @@ export default async function ProjectsPage({
             ))}
           </select>
         </div>
+        <div>
+          <label className="label" htmlFor="f_type">Type</label>
+          <select id="f_type" name="type" defaultValue={f.type} className="input">
+            <option value="">Any type</option>
+            <option value="none">No type</option>
+            {projectTypes.map((t) => (
+              <option key={t.code} value={t.code}>{t.code === t.label ? t.code : `${t.code} (${t.label})`}</option>
+            ))}
+          </select>
+        </div>
         {filtered && (
-          <Link href={`/projects${projectFiltersQS(f, { status: "open", client: "", owner: "", q: "" })}`} className="btn">
+          <Link href={`/projects${projectFiltersQS(f, { status: "open", client: "", owner: "", type: "", q: "" })}`} className="btn">
             Clear filters
           </Link>
         )}

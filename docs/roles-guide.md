@@ -22,7 +22,7 @@ Everyone can see all projects and tasks. There is no client access: Workhub is s
 Filters live in the page address, so a filtered view can be bookmarked or shared, and Back works. Dropdowns apply as soon as you change them; search applies when you press Enter. **Clear filters** resets the view. Exports download exactly what you've filtered to.
 
 - **Everyone:**
-  - **Projects:** search by project or client name; filter by Status (Open, All, or one status), Client (including "No client") and Owner (including "No owner"). Click the Project, Client, Next milestone or Due column headings to sort; click again to reverse.
+  - **Projects:** search by project or client name; filter by Status (Open, All, or one status), Client (including "No client"), Owner (including "No owner") and Type. Click the Project, Client, Next milestone or Due column headings to sort; click again to reverse.
   - **A project's list view:** filter by Assignee (Everyone, Mine, Unassigned, or a person), Status, and Overdue only. Sort by Assignee, Due or Status from the column headings. Tasks stay grouped under their milestones, and done tasks stay at the bottom unless you sort by status.
   - **My Work:** filter your tasks by project or client (shown once your tasks span more than one project).
 - **Admins:** same as everyone.
@@ -33,12 +33,29 @@ Filters live in the page address, so a filtered view can be bookmarked or shared
 
 - **Everyone:** see your open tasks, grouped into Overdue, Due this week, Later and No due date. Change a task's status from the list. The "Logged this week" card shows your hours for Monday to Sunday and links to the Time page.
 
+## Project names
+
+Every project name is built from its parts, the same way as in Workfront: **reference # _ billing year _ name on project _ title _ project type**, for example `973623_2026_The Lanes_Website_TA`.
+
+- **Reference #:** each new project gets the next number automatically. Projects brought over from Workfront keep their Workfront number.
+- **Billing year:** the client's billing year, from the project's start date: a calendar year (2026) or a fiscal year (FY27). It can be overridden on a project.
+- **Name on project:** the client's name, or the brand the client wants on projects (Maloney Group's projects say "Precizion Partners"). It can be overridden on a project.
+- **Title:** what the project is, for example "Website".
+- **Project type:** TA or TB (project types that set the proofing flow), HC (hard costs), Monthly (retainer), Initial (setup fee).
+
+- **Everyone:** sees these on the project page and can filter the Projects list by type.
+- **Admins only:**
+  - Fill them in when creating or editing a project; the name updates as you type and is saved automatically.
+  - On each client: set **Name on projects** and **Billing year** (calendar, or fiscal from a given month). Changing them updates that client's project names.
+  - On the Admin page: set the **Next reference number** (it must stay above every number in use) and manage **Project types** (add, rename the label, retire).
+  - For a project imported from Workfront, tick **Keep this exact name** (under "Reference number and exact name") so its name isn't rebuilt.
+
 ## Projects list
 
 **Where:** Projects in the sidebar.
 
 - **Everyone:** see Open or All projects, each with its client, owner, status, next milestone (with its date and health), open task count and due date.
-- **Admins only:** **+ New project**. Set the name, client, owner, start and due dates. Optionally pick **Start from template**: a start date is then required, and leaving Due empty uses the template's length.
+- **Admins only:** **+ New project**. Set the title, client, project type, start date, owner, due date and cost code (name on project and billing year fill in from the client). A preview shows the full project name. Optionally pick **Start from template**: a start date is then required, and leaving Due empty uses the template's length.
 
 ## Project page
 
@@ -173,13 +190,14 @@ Files open in Excel or Google Sheets.
 **Where:** Clients in the sidebar.
 
 - **Everyone:** see each client with its active and total projects. Select a client (or **View projects**) to see its projects on the Projects page.
-- **Admins only:** add and rename clients. **Delete** appears only for a client with no projects; move or delete its projects first. Projects are linked to a client when they're created or edited.
+- **Admins only:** add and rename clients, and set each client's name on projects and billing year. **Delete** appears only for a client with no projects; move or delete its projects first. Projects are linked to a client when they're created or edited.
 
 ## Admin page (Admins only)
 
 **Where:** Admin in the sidebar.
 
 - **People:** edit name, job role, hours per week, access (Admin or User) and Active. You can't remove your own admin access.
+- **Project names:** the next reference number, and the list of project types.
 - **Recent changes:** the latest changes across Workhub and who made them.
 
 ## Good to know

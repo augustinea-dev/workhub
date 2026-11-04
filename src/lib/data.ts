@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { Company, Profile } from "@/lib/types";
+import type { Company, Profile, ProjectType } from "@/lib/types";
 
 export const getPeople = cache(async (): Promise<Profile[]> => {
   const supabase = await createClient();
@@ -13,8 +13,20 @@ export const getPeople = cache(async (): Promise<Profile[]> => {
 
 export const getCompanies = cache(async (): Promise<Company[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.from("companies").select("id, name").order("name");
+  const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month").order("name");
   return (data ?? []) as Company[];
+});
+
+export const getProjectTypes = cache(async (): Promise<ProjectType[]> => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("project_types").select("*").order("sort_order").order("code");
+  return (data ?? []) as ProjectType[];
+});
+
+export const getNextReference = cache(async (): Promise<number | null> => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("workhub_settings").select("next_reference_number").maybeSingle();
+  return data ? Number(data.next_reference_number) : null;
 });
 
 export const getProjectOptions = cache(async (): Promise<{ id: string; name: string }[]> => {

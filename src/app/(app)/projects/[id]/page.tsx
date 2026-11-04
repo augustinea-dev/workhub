@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { createTask, deleteProject, saveProjectAsTemplate, updateProject } from "../../actions";
 import { Board, type BoardCard } from "@/components/board";
 import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
+import { ProjectNameFields } from "@/components/project-name-fields";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
-import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
+import { getCompanies, getPeople, getProjectTypes, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { PROJECT_STATUSES, TASK_STATUSES, type Project, type Task } from "@/lib/types";
@@ -33,6 +34,7 @@ export default async function ProjectPage({
     getPeople(),
     getCompanies(),
   ]);
+  const projectTypes = await getProjectTypes();
   if (!project) notFound();
 
   const p = project as Project;
@@ -408,10 +410,40 @@ export default async function ProjectPage({
               <form action={updateProject} className="space-y-3">
                 <input type="hidden" name="id" value={id} />
                 <input type="hidden" name="version" value={p.version} />
-                <div>
-                  <label className="label" htmlFor="name">Name</label>
-                  <input id="name" name="name" defaultValue={p.name} required className="input w-full" />
-                </div>
+                <ProjectNameFields
+                  key={p.version}
+                  clients={companies}
+                  types={projectTypes.filter((t) => t.active || t.code === p.project_type)}
+                  reference={p.reference_number}
+                  today={today}
+                  idPrefix="edit"
+                  titleRequired={false}
+                  defaults={{
+                    company_id: p.company_id,
+                    title: p.title ?? (p.name_locked ? "" : p.name),
+                    project_type: p.project_type,
+                    start_date: p.start_date,
+                    name_on_project: p.name_on_project,
+                    billing_year: p.billing_year,
+                  }}
+                />
+                <details className="rounded-md border border-stone-200 px-3 py-2" open={p.name_locked}>
+                  <summary className="cursor-pointer text-xs font-medium text-stone-600">Reference number and exact name</summary>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label className="label" htmlFor="reference_number">Reference #</label>
+                      <input id="reference_number" name="reference_number" inputMode="numeric" defaultValue={p.reference_number ?? ""} className="input w-full" />
+                    </div>
+                    <label className="flex items-start gap-2 text-sm text-stone-700">
+                      <input type="checkbox" name="name_locked" defaultChecked={p.name_locked} className="mt-1" />
+                      <span>Keep this exact name instead of building it (for projects imported from Workfront)</span>
+                    </label>
+                    <div>
+                      <label className="label" htmlFor="name">Exact name</label>
+                      <input id="name" name="name" defaultValue={p.name} className="input w-full" />
+                    </div>
+                  </div>
+                </details>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label" htmlFor="status">Status</label>
@@ -431,23 +463,14 @@ export default async function ProjectPage({
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="label" htmlFor="company_id">Client</label>
-                  <select id="company_id" name="company_id" defaultValue={p.company_id ?? ""} className="input w-full">
-                    <option value="">— None —</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="label" htmlFor="start_date">Start</label>
-                    <input id="start_date" name="start_date" type="date" defaultValue={p.start_date ?? ""} className="input w-full" />
-                  </div>
                   <div>
                     <label className="label" htmlFor="due_date">Due</label>
                     <input id="due_date" name="due_date" type="date" defaultValue={p.due_date ?? ""} className="input w-full" />
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="cost_code">Cost code</label>
+                    <input id="cost_code" name="cost_code" defaultValue={p.cost_code ?? ""} className="input w-full" />
                   </div>
                 </div>
                 <div>
@@ -474,7 +497,15 @@ export default async function ProjectPage({
             <dl className="space-y-3 text-sm">
               <div><dt className="label">Status</dt><dd><ProjectBadge status={p.status} /></dd></div>
               <div><dt className="label">Owner</dt><dd>{nameOf(people, p.owner_id)}</dd></div>
-              <div><dt className="label">Client</dt><dd>{company?.name ?? "—"}</dd></div>
+              <div><dt className="label">Client</dt><dd>{company?.name ?? "No client"}</dd></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><dt className="label">Reference #</dt><dd>{p.reference_number ?? "Not set"}</dd></div>
+                <div>
+                  <dt className="label">Type</dt>
+                  <dd>{p.project_type ? projectTypes.find((t) => t.code === p.project_type)?.label ?? p.project_type : "Not set"}</dd>
+                </div>
+              </div>
+              {p.cost_code && <div><dt className="label">Cost code</dt><dd>{p.cost_code}</dd></div>}
               <div className="grid grid-cols-2 gap-3">
                 <div><dt className="label">Start</dt><dd>{formatDate(p.start_date)}</dd></div>
                 <div><dt className="label">Due</dt><dd>{formatDate(p.due_date)}</dd></div>

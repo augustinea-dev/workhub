@@ -10,6 +10,12 @@ import { PROJECT_STATUSES, type ProjectStatus, type TaskStatus } from "@/lib/typ
 
 type Row = {
   name: string;
+  reference_number: number | null;
+  billing_year: string | null;
+  title: string | null;
+  project_type: string | null;
+  cost_code: string | null;
+  description: string | null;
   status: ProjectStatus;
   start_date: string | null;
   due_date: string | null;
@@ -27,7 +33,7 @@ export async function GET(request: NextRequest) {
   const query = supabase
     .from("projects")
     .select(
-      "name, status, start_date, due_date, owner_id, company_id, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id), time_entries(hours, hour_type)",
+      "name, reference_number, billing_year, title, project_type, cost_code, description, status, start_date, due_date, owner_id, company_id, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id), time_entries(hours, hour_type)",
     );
   const [{ data }, people] = await Promise.all([query, getPeople()]);
   const today = todayISO();
@@ -37,7 +43,12 @@ export async function GET(request: NextRequest) {
     const hours = p.time_entries.reduce((s, t) => s + Number(t.hours), 0);
     const billable = p.time_entries.filter((t) => t.hour_type === "billable").reduce((s, t) => s + Number(t.hours), 0);
     return [
+      p.reference_number ?? "",
       p.name,
+      p.title ?? "",
+      p.project_type ?? "",
+      p.billing_year ?? "",
+      p.cost_code ?? "",
       p.company?.name ?? "",
       p.owner_id ? nameOf(people, p.owner_id) : "",
       PROJECT_STATUSES.find((s) => s.value === p.status)?.label ?? p.status,
@@ -49,12 +60,16 @@ export async function GET(request: NextRequest) {
       p.tasks.length,
       +hours.toFixed(2),
       +billable.toFixed(2),
+      p.description ?? "",
     ];
   });
 
   return csvResponse(
     `workhub-projects-${f.status}-${today}.csv`,
-    ["Project", "Client", "Owner", "Status", "Start", "Due", "Next milestone", "Next milestone date", "Open tasks", "Total tasks", "Hours logged", "Billable hours"],
+    [
+      "Reference #", "Project", "Title", "Type", "Billing year (override)", "Cost code", "Client", "Owner", "Status", "Start", "Due",
+      "Next milestone", "Next milestone date", "Open tasks", "Total tasks", "Hours logged", "Billable hours", "Description",
+    ],
     rows,
   );
 }

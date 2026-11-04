@@ -3,10 +3,28 @@ import { createCompany, deleteCompany, updateCompany } from "../actions";
 import { SubmitButton } from "@/components/client";
 import { Empty, Flash, PageHeader } from "@/components/ui";
 import { sp } from "@/lib/data";
+import { MONTHS } from "@/lib/naming";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
-type Row = { id: string; name: string; projects: { id: string; status: string }[] };
+type Row = {
+  id: string;
+  name: string;
+  project_label: string | null;
+  fiscal_year_start_month: number | null;
+  projects: { id: string; status: string }[];
+};
+
+function YearSelect({ id, value }: { id: string; value: number | null }) {
+  return (
+    <select id={id} name="fiscal_year_start_month" defaultValue={value ?? ""} aria-label="Billing year" className="input py-1.5">
+      <option value="">Calendar year (2026)</option>
+      {MONTHS.slice(1).map((m, i) => (
+        <option key={m} value={i + 2}>Fiscal year from {m} (FY##)</option>
+      ))}
+    </select>
+  );
+}
 
 export default async function ClientsPage({
   searchParams,
@@ -17,7 +35,7 @@ export default async function ClientsPage({
   const me = await requireProfile();
   const isAdmin = me.role === "admin";
   const supabase = await createClient();
-  const { data } = await supabase.from("companies").select("id, name, projects(id, status)").order("name");
+  const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month, projects(id, status)").order("name");
   const rows = (data ?? []) as unknown as Row[];
 
   return (
@@ -26,13 +44,24 @@ export default async function ClientsPage({
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
       {isAdmin && (
-      <form action={createCompany} className="card mb-6 flex flex-wrap gap-2 p-4">
-        <input name="name" required placeholder="Client name" aria-label="Client name" className="input min-w-64 flex-1" />
+      <form action={createCompany} className="card mb-6 flex flex-wrap items-end gap-2 p-4">
+        <div className="min-w-56 flex-1">
+          <label className="label" htmlFor="new_client_name">Client (legal billing name)</label>
+          <input id="new_client_name" name="name" required placeholder="Maloney Group" className="input w-full" />
+        </div>
+        <div className="min-w-48 flex-1">
+          <label className="label" htmlFor="new_client_label">Name on projects</label>
+          <input id="new_client_label" name="project_label" placeholder="Same as client, or a brand" className="input w-full" />
+        </div>
+        <div>
+          <label className="label" htmlFor="new_client_year">Billing year</label>
+          <YearSelect id="new_client_year" value={null} />
+        </div>
         <SubmitButton pendingText="Adding…">Add client</SubmitButton>
       </form>
       )}
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         {rows.length === 0 ? (
           <Empty>No clients yet.</Empty>
         ) : (
@@ -53,13 +82,24 @@ export default async function ClientsPage({
                       <form action={updateCompany} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="id" value={c.id} />
                         <input name="name" required defaultValue={c.name} aria-label={`Name for ${c.name}`} className="input min-w-48 py-1.5" />
-                        <SubmitButton className="btn py-1.5" pendingText="Saving…">Rename</SubmitButton>
+                        <input
+                          name="project_label"
+                          defaultValue={c.project_label ?? ""}
+                          placeholder="Name on projects"
+                          aria-label={`Name on projects for ${c.name}`}
+                          className="input min-w-40 py-1.5"
+                        />
+                        <YearSelect id={`year_${c.id}`} value={c.fiscal_year_start_month} />
+                        <SubmitButton className="btn py-1.5" pendingText="Saving…">Save</SubmitButton>
                         <Link href={`/projects?client=${c.id}&status=all`} className="text-xs font-medium text-stone-500 hover:underline">
                           View projects
                         </Link>
                       </form>
                     ) : (
-                      <Link href={`/projects?client=${c.id}&status=all`} className="font-medium hover:underline">{c.name}</Link>
+                      <>
+                        <Link href={`/projects?client=${c.id}&status=all`} className="font-medium hover:underline">{c.name}</Link>
+                        {c.project_label && <span className="ml-2 text-xs text-stone-500">Projects named “{c.project_label}”</span>}
+                      </>
                     )}
                   </td>
                   <td className="table-cell text-stone-600">

@@ -13,7 +13,14 @@ export type Profile = {
   weekly_hours: number;
 };
 
-export type Company = { id: string; name: string };
+export type Company = {
+  id: string;
+  name: string;
+  project_label: string | null;
+  fiscal_year_start_month: number | null;
+};
+
+export type ProjectType = { code: string; label: string; description: string | null; active: boolean; sort_order: number };
 
 export type Project = {
   id: string;
@@ -24,6 +31,13 @@ export type Project = {
   start_date: string | null;
   due_date: string | null;
   description: string | null;
+  reference_number: number | null;
+  billing_year: string | null;
+  name_on_project: string | null;
+  title: string | null;
+  project_type: string | null;
+  cost_code: string | null;
+  name_locked: boolean;
   version: number;
   updated_at: string;
 };

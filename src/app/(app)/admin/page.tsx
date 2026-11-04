@@ -1,8 +1,8 @@
-import { updateMember } from "../actions";
+import { saveProjectType, updateMember, updateNextReference } from "../actions";
 import { SubmitButton } from "@/components/client";
 import { Flash, PageHeader } from "@/components/ui";
 import { formatTimestamp } from "@/lib/dates";
-import { getPeople, nameOf, sp } from "@/lib/data";
+import { getNextReference, getPeople, getProjectTypes, nameOf, sp } from "@/lib/data";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,7 +23,7 @@ export default async function AdminPage({
 }) {
   const params = await searchParams;
   const me = await requireAdmin();
-  const people = await getPeople();
+  const [people, projectTypes, nextReference] = await Promise.all([getPeople(), getProjectTypes(), getNextReference()]);
   const supabase = await createClient();
   const { data: audit } = await supabase
     .from("audit_log")
@@ -78,6 +78,63 @@ export default async function AdminPage({
           part-time staff). To add someone: Supabase dashboard → Authentication → Users → <strong>Invite user</strong>. They appear here
           after they accept, as a User.
         </p>
+      </section>
+
+      <section className="card mb-6 overflow-x-auto">
+        <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">Project names</h2>
+        <form action={updateNextReference} className="flex flex-wrap items-end gap-2 border-b border-stone-100 px-4 py-4">
+          <div>
+            <label className="label" htmlFor="next_reference_number">Next reference number</label>
+            <input
+              id="next_reference_number"
+              name="next_reference_number"
+              inputMode="numeric"
+              defaultValue={nextReference ?? ""}
+              className="input w-40"
+            />
+          </div>
+          <SubmitButton className="btn">Save</SubmitButton>
+          <p className="w-full text-xs text-stone-500">
+            The number the next new project gets. It must stay above every number already in use; projects imported from
+            Workfront keep their own numbers.
+          </p>
+        </form>
+        <div className="px-4 py-3">
+          <p className="label">Project types</p>
+          <p className="mb-3 text-xs text-stone-500">
+            The code goes at the end of project names (for example TA or HC). Codes can&apos;t be changed once added; untick
+            Active to retire one.
+          </p>
+          <div className="space-y-2">
+            {projectTypes.map((t) => (
+              <form key={t.code} action={saveProjectType} className="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="existing" value={t.code} />
+                <span className="w-20 font-mono text-sm font-medium">{t.code}</span>
+                <input name="label" defaultValue={t.label} aria-label={`Label for ${t.code}`} className="input w-40 py-1.5" />
+                <input
+                  name="description"
+                  defaultValue={t.description ?? ""}
+                  placeholder="What it's for"
+                  aria-label={`Description for ${t.code}`}
+                  className="input min-w-56 flex-1 py-1.5"
+                />
+                <input name="sort_order" type="number" defaultValue={t.sort_order} aria-label={`Order for ${t.code}`} className="input w-20 py-1.5" />
+                <label className="flex items-center gap-1 text-sm">
+                  <input type="checkbox" name="active" value="on" defaultChecked={t.active} /> Active
+                </label>
+                <SubmitButton className="btn py-1.5">Save</SubmitButton>
+              </form>
+            ))}
+            <form action={saveProjectType} className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
+              <input type="hidden" name="active" value="on" />
+              <input name="code" required placeholder="Code" aria-label="New type code" className="input w-20 py-1.5 font-mono" />
+              <input name="label" placeholder="Label" aria-label="New type label" className="input w-40 py-1.5" />
+              <input name="description" placeholder="What it's for" aria-label="New type description" className="input min-w-56 flex-1 py-1.5" />
+              <input name="sort_order" type="number" defaultValue={projectTypes.length + 1} aria-label="New type order" className="input w-20 py-1.5" />
+              <SubmitButton className="btn py-1.5" pendingText="Adding…">Add type</SubmitButton>
+            </form>
+          </div>
+        </div>
       </section>
 
       <section className="card overflow-x-auto">

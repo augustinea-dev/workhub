@@ -45,12 +45,20 @@ function oneOf<T extends string>(v: string, list: { value: T }[], fallback: T): 
 }
 
 // ---------- clients ----------
+function clientNaming(fd: FormData) {
+  const month = Number.parseInt(str(fd, "fiscal_year_start_month"), 10);
+  return {
+    project_label: opt(fd, "project_label"),
+    fiscal_year_start_month: month >= 2 && month <= 12 ? month : null,
+  };
+}
+
 export async function createCompany(fd: FormData) {
   await requireAdmin();
   const name = str(fd, "name");
   if (!name) fail("/clients", "Enter a client name.");
   const supabase = await createClient();
-  const { error } = await supabase.from("companies").insert({ name });
+  const { error } = await supabase.from("companies").insert({ name, ...clientNaming(fd) });
   if (error) fail("/clients", error.code === "23505" ? `${name} already exists.` : error.message);
   done("/clients", `Added ${name}.`);
 }
@@ -60,10 +68,14 @@ export async function updateCompany(fd: FormData) {
   const name = str(fd, "name");
   if (!name) fail("/clients", "Client name can't be empty.");
   const supabase = await createClient();
-  const { data, error } = await supabase.from("companies").update({ name }).eq("id", str(fd, "id")).select("id");
+  const { data, error } = await supabase
+    .from("companies")
+    .update({ name, ...clientNaming(fd) })
+    .eq("id", str(fd, "id"))
+    .select("id");
   if (error) fail("/clients", error.code === "23505" ? `${name} already exists.` : error.message);
-  if (!data?.length) fail("/clients", "Only an admin can rename clients.");
-  done("/clients", `Renamed to ${name}.`);
+  if (!data?.length) fail("/clients", "Only an admin can change clients.");
+  done("/clients", `Saved ${name}. Its projects' names are updated to match.`);
 }
 
 export async function deleteCompany(fd: FormData) {
@@ -77,17 +89,66 @@ export async function deleteCompany(fd: FormData) {
   done("/clients", `Deleted ${data[0].name}.`);
 }
 
+// ---------- settings (admin) ----------
+export async function updateNextReference(fd: FormData) {
+  await requireAdmin();
+  const next = Number.parseInt(str(fd, "next_reference_number"), 10);
+  if (!Number.isInteger(next) || next <= 0) fail("/admin", "Enter a whole number.");
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("workhub_settings")
+    .update({ next_reference_number: next })
+    .eq("id", true)
+    .select("next_reference_number");
+  if (error) fail("/admin", error.message);
+  if (!data?.length) fail("/admin", "Only an admin can change settings.");
+  done("/admin", `New projects will start at ${next}.`);
+}
+
+export async function saveProjectType(fd: FormData) {
+  await requireAdmin();
+  const existing = str(fd, "existing");
+  const code = existing || str(fd, "code");
+  const label = str(fd, "label") || code;
+  if (!/^[A-Za-z0-9]+$/.test(code)) fail("/admin", "A project type code is letters and numbers only, like TA or Monthly.");
+  const row = {
+    code,
+    label,
+    description: opt(fd, "description"),
+    active: str(fd, "active") === "on",
+    sort_order: Number.parseInt(str(fd, "sort_order"), 10) || 0,
+  };
+  const supabase = await createClient();
+  const { error } = existing
+    ? await supabase.from("project_types").update(row).eq("code", existing)
+    : await supabase.from("project_types").insert(row);
+  if (error) fail("/admin", error.code === "23505" ? `${code} already exists.` : error.message);
+  done("/admin", `Saved project type ${code}.`);
+}
+
 // ---------- projects ----------
+/** The parts the database builds a project's name from. */
+function namingFields(fd: FormData) {
+  return {
+    title: str(fd, "title"),
+    project_type: opt(fd, "project_type"),
+    name_on_project: opt(fd, "name_on_project"),
+    billing_year: opt(fd, "billing_year"),
+    cost_code: opt(fd, "cost_code"),
+  };
+}
+
 export async function createProject(fd: FormData) {
   const me = await requireAdmin();
-  const name = str(fd, "name");
-  if (!name) fail("/projects", "Enter a project name.");
+  const naming = namingFields(fd);
+  if (!naming.title) fail("/projects", "Enter a project title.");
   if (str(fd, "template_id")) return createProjectFromTemplate(fd, me.id);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
     .insert({
-      name,
+      ...naming,
+      name: naming.title,
       company_id: opt(fd, "company_id"),
       owner_id: opt(fd, "owner_id") ?? me.id,
       start_date: optDate(fd, "start_date"),
@@ -101,19 +162,21 @@ export async function createProject(fd: FormData) {
 }
 
 async function createProjectFromTemplate(fd: FormData, ownerFallback: string) {
-  const name = str(fd, "name");
+  const naming = namingFields(fd);
   const start = optDate(fd, "start_date");
   if (!start) fail("/projects", "Pick a start date so the template's task dates can be worked out.");
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_project_from_template", {
     p_template: str(fd, "template_id"),
-    p_name: name,
+    p_name: naming.title,
     p_company: opt(fd, "company_id"),
     p_owner: opt(fd, "owner_id") ?? ownerFallback,
     p_start: start,
     p_due: optDate(fd, "due_date"),
   });
   if (error || !data) fail("/projects", error?.message ?? "Couldn't create the project.");
+  const { error: namingError } = await supabase.from("projects").update(naming).eq("id", data);
+  if (namingError) fail(`/projects/${data}`, `Project created, but its name couldn't be set: ${namingError.message}`);
   done(`/projects/${data}`, "Project created from the template.");
 }
 
@@ -132,13 +195,21 @@ export async function updateProject(fd: FormData) {
   await requireAdmin();
   const id = str(fd, "id");
   const path = `/projects/${id}`;
+  const locked = str(fd, "name_locked") === "on";
+  const naming = namingFields(fd);
   const name = str(fd, "name");
-  if (!name) fail(path, "Project name can't be empty.");
+  if (locked ? !name : !naming.title) fail(path, locked ? "Project name can't be empty." : "Project title can't be empty.");
+  const refText = str(fd, "reference_number");
+  const reference = refText ? Number.parseInt(refText, 10) : null;
+  if (refText && !(Number.isInteger(reference) && reference! > 0)) fail(path, "Reference number must be a whole number.");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
     .update({
-      name,
+      ...naming,
+      ...(reference ? { reference_number: reference } : {}),
+      name_locked: locked,
+      ...(locked ? { name } : {}),
       company_id: opt(fd, "company_id"),
       owner_id: opt(fd, "owner_id"),
       status: oneOf(str(fd, "status"), PROJECT_STATUSES, "active"),
@@ -149,7 +220,7 @@ export async function updateProject(fd: FormData) {
     .eq("id", id)
     .eq("version", int(fd, "version"))
     .select("id");
-  if (error) fail(path, error.message);
+  if (error) fail(path, error.code === "23505" ? "That reference number is already used by another project." : error.message);
   if (!data?.length) fail(path, CONFLICT);
   done(path, "Project saved.");
 }

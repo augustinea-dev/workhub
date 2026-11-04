@@ -38,6 +38,7 @@ export type ProjectFilters = {
   status: "open" | "all" | ProjectStatus;
   client: string;
   owner: string;
+  type: string;
   q: string;
   sort: ProjectSort;
   dir: SortDir;
@@ -50,6 +51,7 @@ export function parseProjectFilters(p: Params): ProjectFilters {
     status: status === "all" || PROJECT_STATUSES.some((s) => s.value === status) ? (status as ProjectFilters["status"]) : "open",
     client: one(p, "client"),
     owner: one(p, "owner"),
+    type: one(p, "type"),
     q: one(p, "q"),
     sort: (PROJECT_SORTS as readonly string[]).includes(sort) ? (sort as ProjectSort) : "due",
     dir: dirOf(p),
@@ -62,6 +64,7 @@ export function projectFiltersQS(f: ProjectFilters, override: Partial<ProjectFil
     status: v.status === "open" ? undefined : v.status,
     client: v.client,
     owner: v.owner,
+    type: v.type,
     q: v.q,
     sort: v.sort === "due" ? undefined : v.sort,
     dir: v.dir === "asc" ? undefined : v.dir,
@@ -69,7 +72,7 @@ export function projectFiltersQS(f: ProjectFilters, override: Partial<ProjectFil
 }
 
 export function hasProjectFilters(f: ProjectFilters): boolean {
-  return f.status !== "open" || !!f.client || !!f.owner || !!f.q;
+  return f.status !== "open" || !!f.client || !!f.owner || !!f.type || !!f.q;
 }
 
 type ProjectLike = {
@@ -78,6 +81,7 @@ type ProjectLike = {
   due_date: string | null;
   owner_id: string | null;
   company_id: string | null;
+  project_type?: string | null;
   company: { name: string } | null;
   tasks: { id: string; title: string; status: TaskStatus; due_date: string | null; is_milestone: boolean; milestone_id: string | null }[];
 };
@@ -90,6 +94,7 @@ export function filterAndSortProjects<T extends ProjectLike>(rows: T[], f: Proje
         (f.status === "open" ? p.status !== "complete" && p.status !== "cancelled" : p.status === f.status)) &&
       (!f.client || (f.client === "none" ? !p.company_id : p.company_id === f.client)) &&
       (!f.owner || (f.owner === "none" ? !p.owner_id : p.owner_id === f.owner)) &&
+      (!f.type || (f.type === "none" ? !p.project_type : p.project_type === f.type)) &&
       (!q || p.name.toLowerCase().includes(q) || !!p.company?.name.toLowerCase().includes(q)),
   );
   const key = (p: T): string | null | undefined =>
