@@ -55,6 +55,28 @@ export async function createCompany(fd: FormData) {
   done("/clients", `Added ${name}.`);
 }
 
+export async function updateCompany(fd: FormData) {
+  await requireAdmin();
+  const name = str(fd, "name");
+  if (!name) fail("/clients", "Client name can't be empty.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("companies").update({ name }).eq("id", str(fd, "id")).select("id");
+  if (error) fail("/clients", error.code === "23505" ? `${name} already exists.` : error.message);
+  if (!data?.length) fail("/clients", "Only an admin can rename clients.");
+  done("/clients", `Renamed to ${name}.`);
+}
+
+export async function deleteCompany(fd: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("companies").delete().eq("id", str(fd, "id")).select("name");
+  if (error) {
+    fail("/clients", error.code === "23503" ? "This client still has projects. Move or delete them first." : error.message);
+  }
+  if (!data?.length) fail("/clients", "Only an admin can delete clients.");
+  done("/clients", `Deleted ${data[0].name}.`);
+}
+
 // ---------- projects ----------
 export async function createProject(fd: FormData) {
   const me = await requireAdmin();

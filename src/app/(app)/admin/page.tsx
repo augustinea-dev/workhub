@@ -60,7 +60,7 @@ export default async function AdminPage({
                   h/week
                 </label>
                 <select name="role" defaultValue={p.role} aria-label="Access" className="input">
-                  <option value="member">Member</option>
+                  <option value="member">User</option>
                   <option value="admin">Admin</option>
                 </select>
                 <label className="flex items-center gap-1 text-sm">
@@ -76,7 +76,7 @@ export default async function AdminPage({
         <p className="px-4 py-3 text-xs text-stone-500">
           Hours per week is the minimum someone must log before they can submit a timesheet (40 by default; lower it for
           part-time staff). To add someone: Supabase dashboard → Authentication → Users → <strong>Invite user</strong>. They appear here
-          after they accept, as a Member.
+          after they accept, as a User.
         </p>
       </section>
 

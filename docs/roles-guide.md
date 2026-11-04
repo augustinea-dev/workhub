@@ -3,7 +3,7 @@
 Working notes for the future onboarding guides. Each section covers one part of Workhub: where to find it, what everyone can do, and what only Admins can do. Keep it in plain language and update it whenever a feature lands or a permission changes.
 
 - **Admin**: manages clients, projects, tasks, templates, people and timesheet approvals.
-- **User**: everyone else (shown as "Member" on the Admin page). Works on their tasks, posts updates and logs time.
+- **User**: everyone else. Works on their tasks, posts updates and logs time.
 
 Everyone can see all projects and tasks. There is no client access: Workhub is staff only.
 
@@ -155,14 +155,14 @@ Files open in Excel or Google Sheets.
 
 **Where:** Clients in the sidebar.
 
-- **Everyone:** see each client with its active and total projects.
-- **Admins only:** add clients. Projects are linked to a client when they're created or edited.
+- **Everyone:** see each client with its active and total projects. Select a client (or **View projects**) to see its projects on the Projects page.
+- **Admins only:** add and rename clients. **Delete** appears only for a client with no projects; move or delete its projects first. Projects are linked to a client when they're created or edited.
 
 ## Admin page (Admins only)
 
 **Where:** Admin in the sidebar.
 
-- **People:** edit name, job role, hours per week, access (Admin or Member) and Active. You can't remove your own admin access.
+- **People:** edit name, job role, hours per week, access (Admin or User) and Active. You can't remove your own admin access.
 - **Recent changes:** the latest changes across Workhub and who made them.
 
 ## Good to know
