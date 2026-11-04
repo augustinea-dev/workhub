@@ -41,7 +41,10 @@ src/lib/                    supabase clients, session (requireProfile / requireA
 | Change task status | Any task | Only tasks assigned to them (trigger `guard_task_update` blocks other columns) |
 | Comment | ✓ | ✓ |
 | Log time | ✓ | Own only |
-| Edit / remove time entries | Anyone's | Own only |
+| Edit / remove time entries | Anyone's | Own only, and never in a submitted or approved week (admins must reopen it first) |
+| Submit / recall a week's timesheet | Own | Own |
+| Approve, return (with note) or reopen timesheets | ✓ | ✗ |
+| Set someone's hours per week | ✓ | ✗ (trigger `guard_profile_update`) |
 | Delete projects, tasks, comments, clients | ✓ | ✗ |
 | Admin page, audit log, other people's timesheets | ✓ | ✗ |
 | Project templates (view, create, edit, delete, use, save project as template) | ✓ | ✗ |
@@ -50,7 +53,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
@@ -65,6 +68,8 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 - Forms post to server actions and redirect with `?error=` / `?notice=`, rendered by `<Flash>`.
 - Pages that others can change include `<LiveRefresh subs={…}>` for Realtime refresh.
 - Templates (`project_templates`, `template_tasks`) store days as working days from the project start (Mon to Fri; `add_working_days()` in SQL and `addWorkingDays()` in `dates.ts` must match, and holidays would go in both). Projects are created from templates, and saved as templates, by the database functions `create_project_from_template()` and `create_template_from_project()` in one transaction.
+- Timesheets: one row per person per Monday week in `timesheets`, changed only through `submit_timesheet()`, `recall_timesheet()`, `decide_timesheet()` and `reopen_timesheet()` (no direct write policies). A week can't be submitted below the person's `profiles.weekly_hours` (PTO counts). Trigger `guard_locked_week` blocks time entry changes in submitted or approved weeks for everyone.
+- `docs/roles-guide.md` lists what Admins and Users can do, feature by feature, in plain language for the future onboarding doc. Update it whenever a feature lands or a permission changes.
 - Milestones are tasks with `is_milestone`; other tasks join one through `milestone_id` (same project, enforced by trigger). Health (on track / at risk / late) is computed in `src/lib/milestones.ts`.
 
 ## Commands
@@ -77,6 +82,6 @@ npm run lint
 
 ## Next up (MVP)
 
-Email notifications, @mentions, Kanban board, subtasks UI, list sorting/filters, project templates, timesheet submit/approve, CSV/Excel export, custom fields, teams/groups, Microsoft (Entra ID) sign-in, Dropbox integration (later phase). Update the Build progress tracker as features land.
+Email notifications, subtasks UI, list sorting/filters, CSV/Excel export, custom fields, teams/groups, Microsoft (Entra ID) sign-in, Dropbox integration (later phase). Update the Build progress tracker as features land.
 
 Open question: should members be able to mark tasks complete when they aren't assigned to them? Currently assigned-only.

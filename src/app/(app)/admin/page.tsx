@@ -46,6 +46,19 @@ export default async function AdminPage({
                 <input name="full_name" defaultValue={p.full_name} aria-label="Full name" className="input w-48" />
                 <span className="w-56 truncate text-sm text-stone-500">{p.email}</span>
                 <input name="job_role" defaultValue={p.job_role ?? ""} placeholder="Job role" aria-label="Job role" className="input w-40" />
+                <label className="flex items-center gap-1 text-sm text-stone-600">
+                  <input
+                    name="weekly_hours"
+                    type="number"
+                    min="0"
+                    max="80"
+                    step="0.5"
+                    defaultValue={Number(p.weekly_hours)}
+                    aria-label="Hours per week"
+                    className="input w-20"
+                  />
+                  h/week
+                </label>
                 <select name="role" defaultValue={p.role} aria-label="Access" className="input">
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
@@ -61,7 +74,8 @@ export default async function AdminPage({
           ))}
         </ul>
         <p className="px-4 py-3 text-xs text-stone-500">
-          To add someone: Supabase dashboard → Authentication → Users → <strong>Invite user</strong>. They appear here
+          Hours per week is the minimum someone must log before they can submit a timesheet (40 by default; lower it for
+          part-time staff). To add someone: Supabase dashboard → Authentication → Users → <strong>Invite user</strong>. They appear here
           after they accept, as a Member.
         </p>
       </section>

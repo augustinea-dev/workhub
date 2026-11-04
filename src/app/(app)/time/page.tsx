@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { logTime } from "../actions";
+import { decideTimesheet, logTime, recallTimesheet, reopenTimesheet, submitTimesheet } from "../actions";
 import { SubmitButton } from "@/components/client";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
-import { Empty, Flash, PageHeader } from "@/components/ui";
-import { addDays, formatDate, formatDay, isValidISODate, todayISO, weekStart } from "@/lib/dates";
+import { Empty, Flash, PageHeader, TimesheetBadge } from "@/components/ui";
+import { addDays, formatDate, formatDay, formatTimestamp, isValidISODate, todayISO, weekStart } from "@/lib/dates";
 import { getPeople, getProjectOptions, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { HOUR_TYPES, type HourType } from "@/lib/types";
+import { HOUR_TYPES, type HourType, type Timesheet } from "@/lib/types";
 
 type Row = {
   id: string;
@@ -38,7 +38,7 @@ export default async function TimePage({
   const userId = isAdmin && requestedUser && people.some((p) => p.id === requestedUser) ? requestedUser : me.id;
 
   const supabase = await createClient();
-  const [{ data }, projects] = await Promise.all([
+  const [{ data }, projects, { data: sheet }, { count: waiting }] = await Promise.all([
     supabase
       .from("time_entries")
       .select("id, user_id, work_date, hours, hour_type, note, project:projects(id, name), task:tasks(id, title)")
@@ -48,7 +48,17 @@ export default async function TimePage({
       .order("work_date")
       .order("created_at"),
     getProjectOptions(),
+    supabase.from("timesheets").select("*").eq("user_id", userId).eq("week_start", monday).maybeSingle(),
+    isAdmin
+      ? supabase.from("timesheets").select("id", { count: "exact", head: true }).eq("status", "submitted")
+      : Promise.resolve({ count: 0 }),
   ]);
+  const ts = sheet as Timesheet | null;
+  const status = ts?.status ?? "open";
+  const locked = status === "submitted" || status === "approved";
+  const isOwn = userId === me.id;
+  const expected = Number(people.find((p) => p.id === userId)?.weekly_hours ?? 40);
+  const notStarted = monday > weekStart(todayISO());
   const rows = (data ?? []) as unknown as Row[];
   const total = rows.reduce((s, r) => s + Number(r.hours), 0);
   const billable = rows.filter((r) => r.hour_type === "billable").reduce((s, r) => s + Number(r.hours), 0);
@@ -68,6 +78,14 @@ export default async function TimePage({
         subtitle={`Week of ${formatDate(monday)} – ${formatDate(sunday)} · ${userId === me.id ? "You" : nameOf(people, userId)}`}
       >
         <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <Link href="/time/approvals" className="btn">
+              Approvals
+              {!!waiting && (
+                <span className="ml-2 rounded-full bg-blue-700 px-2 text-xs font-semibold text-white">{waiting}</span>
+              )}
+            </Link>
+          )}
           <Link href={qs(addDays(monday, -7))} className="btn" aria-label="Previous week">←</Link>
           <Link href={qs(weekStart(todayISO()))} className="btn">This week</Link>
           <Link href={qs(addDays(monday, 7))} className="btn" aria-label="Next week">→</Link>
@@ -85,6 +103,72 @@ export default async function TimePage({
         </div>
       </PageHeader>
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
+
+      <section className="card mb-6 flex flex-wrap items-center justify-between gap-4 p-4">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            Timesheet <TimesheetBadge status={status} />
+          </p>
+          <p className="mt-1 text-sm text-stone-600">
+            {status === "submitted" && ts?.submitted_at
+              ? `Submitted ${formatTimestamp(ts.submitted_at)} with ${Number(ts.total_hours)} h. Time is locked while it's reviewed.`
+              : status === "approved" && ts?.decided_at
+                ? `Approved by ${ts.decided_by ? nameOf(people, ts.decided_by) : "an admin"} on ${formatTimestamp(ts.decided_at)}. Time is locked.`
+                : notStarted
+                  ? "This week hasn't started yet."
+                  : `${+total.toFixed(2)} of ${expected} h logged${total >= expected ? ", ready to submit." : `. Log ${+(expected - total).toFixed(2)} h more to submit.`}`}
+          </p>
+          {status === "returned" && ts?.return_note && (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Returned by {ts.decided_by ? nameOf(people, ts.decided_by) : "an admin"}: {ts.return_note}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {isOwn && (status === "open" || status === "returned") && !notStarted && (
+            <form action={submitTimesheet}>
+              <input type="hidden" name="week" value={monday} />
+              <input type="hidden" name="redirect_to" value={here} />
+              {total >= expected ? (
+                <SubmitButton pendingText="Submitting…">Submit week</SubmitButton>
+              ) : (
+                <button type="button" disabled className="btn-primary" title={`Needs ${expected} h`}>Submit week</button>
+              )}
+            </form>
+          )}
+          {isOwn && status === "submitted" && (
+            <form action={recallTimesheet}>
+              <input type="hidden" name="week" value={monday} />
+              <input type="hidden" name="redirect_to" value={here} />
+              <SubmitButton className="btn" pendingText="Recalling…">Recall to edit</SubmitButton>
+            </form>
+          )}
+          {isAdmin && status === "submitted" && ts && (
+            <>
+              <form action={decideTimesheet}>
+                <input type="hidden" name="id" value={ts.id} />
+                <input type="hidden" name="decision" value="approve" />
+                <input type="hidden" name="redirect_to" value={here} />
+                <SubmitButton pendingText="Approving…">Approve</SubmitButton>
+              </form>
+              <form action={decideTimesheet} className="flex gap-2">
+                <input type="hidden" name="id" value={ts.id} />
+                <input type="hidden" name="decision" value="return" />
+                <input type="hidden" name="redirect_to" value={here} />
+                <input name="note" required placeholder="What needs fixing?" aria-label="Return note" className="input w-56" />
+                <SubmitButton className="btn" pendingText="Returning…">Return</SubmitButton>
+              </form>
+            </>
+          )}
+          {isAdmin && status === "approved" && ts && (
+            <form action={reopenTimesheet}>
+              <input type="hidden" name="id" value={ts.id} />
+              <input type="hidden" name="redirect_to" value={here} />
+              <SubmitButton className="btn" pendingText="Reopening…">Reopen</SubmitButton>
+            </form>
+          )}
+        </div>
+      </section>
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Total" value={`${total.toFixed(2)} h`} />
@@ -117,7 +201,7 @@ export default async function TimePage({
         </table>
       </div>
 
-      {userId === me.id && (
+      {isOwn && !locked && (
         <form action={logTime} className="card mb-6 p-4">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Log time</p>
           <div className="grid gap-2 md:grid-cols-[1fr_9rem_6rem_9rem_1fr_auto]">
@@ -144,12 +228,15 @@ export default async function TimePage({
 
       <div className="card">
         <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
-          Entries <span className="font-normal text-stone-400">· select Edit to change or remove one</span>
+          Entries{" "}
+          <span className="font-normal text-stone-400">
+            · {locked ? "locked while the timesheet is submitted or approved" : "select Edit to change or remove one"}
+          </span>
         </h2>
         {timeRows.length === 0 ? (
           <Empty>No time logged this week.</Empty>
         ) : (
-          <TimeEntryTable rows={timeRows} meId={me.id} isAdmin={isAdmin} redirectTo={here} second="work" />
+          <TimeEntryTable rows={timeRows} meId={me.id} isAdmin={isAdmin} redirectTo={here} second="work" locked={locked} />
         )}
       </div>
     </>

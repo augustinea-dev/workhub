@@ -6,7 +6,7 @@ export const getPeople = cache(async (): Promise<Profile[]> => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, job_role, active")
+    .select("id, email, full_name, role, job_role, active, weekly_hours")
     .order("full_name");
   return (data ?? []) as Profile[];
 });

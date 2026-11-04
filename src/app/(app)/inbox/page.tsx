@@ -11,7 +11,7 @@ export default async function InboxPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("notification_events")
-    .select("id, kind, summary, task_id, project_id, read_at, created_at")
+    .select("id, kind, summary, task_id, project_id, timesheet_id, read_at, created_at")
     .eq("recipient_id", me.id)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -30,7 +30,7 @@ export default async function InboxPage() {
       </PageHeader>
       <div className="card overflow-hidden">
         {items.length === 0 ? (
-          <Empty>You&apos;ll see assignments, mentions and new comments here.</Empty>
+          <Empty>You&apos;ll see assignments, mentions, new comments and timesheet decisions here.</Empty>
         ) : (
           <ul>
             {items.map((n) => (
@@ -40,7 +40,10 @@ export default async function InboxPage() {
                   {n.kind === "mention" && (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900">Mention</span>
                   )}
-                  {n.task_id ? (
+                  {n.kind.startsWith("timesheet_") && (
+                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">Timesheet</span>
+                  )}
+                  {n.task_id || n.timesheet_id ? (
                     <a href={`/inbox/open/${n.id}`} className={`text-sm hover:underline ${n.read_at ? "" : "font-semibold"}`}>{n.summary}</a>
                   ) : (
                     <p className="text-sm font-medium">{n.summary}</p>

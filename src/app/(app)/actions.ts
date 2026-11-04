@@ -438,6 +438,48 @@ export async function deleteTime(fd: FormData) {
   done(back, "Time entry removed.");
 }
 
+// ---------- timesheets ----------
+export async function submitTimesheet(fd: FormData) {
+  await requireProfile();
+  const back = safePath(str(fd, "redirect_to"), "/time");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("submit_timesheet", { p_week: str(fd, "week") });
+  if (error) fail(back, error.message);
+  done(back, "Week submitted. Its time is locked until an admin approves or returns it.");
+}
+
+export async function recallTimesheet(fd: FormData) {
+  await requireProfile();
+  const back = safePath(str(fd, "redirect_to"), "/time");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("recall_timesheet", { p_week: str(fd, "week") });
+  if (error) fail(back, error.message);
+  done(back, "Week recalled. You can change its time and submit again.");
+}
+
+export async function decideTimesheet(fd: FormData) {
+  await requireAdmin();
+  const back = safePath(str(fd, "redirect_to"), "/time/approvals");
+  const approve = str(fd, "decision") === "approve";
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decide_timesheet", {
+    p_id: str(fd, "id"),
+    p_approve: approve,
+    p_note: opt(fd, "note"),
+  });
+  if (error) fail(back, error.message);
+  done(back, approve ? "Timesheet approved." : "Timesheet returned with your note.");
+}
+
+export async function reopenTimesheet(fd: FormData) {
+  await requireAdmin();
+  const back = safePath(str(fd, "redirect_to"), "/time/approvals");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reopen_timesheet", { p_id: str(fd, "id") });
+  if (error) fail(back, error.message);
+  done(back, "Timesheet reopened. Its time can be changed again.");
+}
+
 // ---------- inbox ----------
 export async function markAllRead() {
   const me = await requireProfile();
@@ -459,10 +501,14 @@ export async function updateMember(fd: FormData) {
   if (id === me.id && (role !== "admin" || !active)) {
     fail("/admin", "You can't remove your own admin access. Ask another admin.");
   }
+  const weeklyHours = Number.parseFloat(str(fd, "weekly_hours"));
+  if (!Number.isFinite(weeklyHours) || weeklyHours < 0 || weeklyHours > 80) {
+    fail("/admin", "Weekly hours must be between 0 and 80.");
+  }
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: str(fd, "full_name") || undefined, job_role: opt(fd, "job_role"), role, active })
+    .update({ full_name: str(fd, "full_name") || undefined, job_role: opt(fd, "job_role"), role, active, weekly_hours: weeklyHours })
     .eq("id", id);
   if (error) fail("/admin", error.message);
   done("/admin", "Saved.");

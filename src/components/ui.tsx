@@ -1,5 +1,5 @@
 import type { Health } from "@/lib/milestones";
-import type { ProjectStatus, TaskStatus } from "@/lib/types";
+import type { ProjectStatus, TaskStatus, TimesheetStatus } from "@/lib/types";
 import { PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
 
 export function Flash({ error, notice }: { error?: string; notice?: string }) {
@@ -83,4 +83,16 @@ export function HealthBadge({ health, showReason }: { health: Health; showReason
       {showReason && health.reason && <span className="text-xs text-stone-500">{health.reason}</span>}
     </span>
   );
+}
+
+const TIMESHEET: Record<TimesheetStatus, { label: string; tone: string }> = {
+  open: { label: "Open", tone: "bg-stone-100 text-stone-700" },
+  submitted: { label: "Submitted", tone: "bg-blue-50 text-blue-800" },
+  approved: { label: "Approved", tone: "bg-emerald-50 text-emerald-800" },
+  returned: { label: "Returned", tone: "bg-amber-50 text-amber-800" },
+};
+
+export function TimesheetBadge({ status }: { status: TimesheetStatus }) {
+  const t = TIMESHEET[status];
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${t.tone}`}>{t.label}</span>;
 }

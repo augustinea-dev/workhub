@@ -31,11 +31,14 @@ export function TimeEntryTable({
   isAdmin,
   redirectTo,
   second,
+  locked = false,
 }: {
   rows: TimeRow[];
   meId: string;
   isAdmin: boolean;
   redirectTo: string;
+  /** The week's timesheet is submitted or approved, so nothing can be edited. */
+  locked?: boolean;
   /** What the second column shows: the person (on a task) or the project / task (on the Time page). */
   second: "person" | "work";
 }) {
@@ -54,7 +57,7 @@ export function TimeEntryTable({
           <Row
             key={r.id}
             r={r}
-            canEdit={isAdmin || r.user_id === meId}
+            canEdit={!locked && (isAdmin || r.user_id === meId)}
             redirectTo={redirectTo}
             second={second}
           />

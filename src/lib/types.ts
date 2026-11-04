@@ -10,6 +10,7 @@ export type Profile = {
   role: UserRole;
   job_role: string | null;
   active: boolean;
+  weekly_hours: number;
 };
 
 export type Company = { id: string; name: string };
@@ -74,6 +75,7 @@ export type NotificationEvent = {
   summary: string;
   task_id: string | null;
   project_id: string | null;
+  timesheet_id: string | null;
   read_at: string | null;
   created_at: string;
 };
@@ -122,4 +124,18 @@ export type TemplateTask = {
   assignee_id: string | null;
   sort_order: number;
   version: number;
+};
+
+export type TimesheetStatus = "open" | "submitted" | "approved" | "returned";
+
+export type Timesheet = {
+  id: string;
+  user_id: string;
+  week_start: string;
+  status: TimesheetStatus;
+  total_hours: number | null;
+  submitted_at: string | null;
+  decided_at: string | null;
+  decided_by: string | null;
+  return_note: string | null;
 };

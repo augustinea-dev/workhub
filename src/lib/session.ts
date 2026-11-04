@@ -12,7 +12,7 @@ export const requireProfile = cache(async (): Promise<Profile> => {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, job_role, active")
+    .select("id, email, full_name, role, job_role, active, weekly_hours")
     .eq("id", userId)
     .single();
 
