@@ -2,15 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteProject, saveProjectAsTemplate, updateProject } from "../../actions";
 import { Board, type BoardCard } from "@/components/board";
-import { LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
+import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
+import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
 import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { PROJECT_STATUSES, type Project, type Task } from "@/lib/types";
+import { PROJECT_STATUSES, TASK_STATUSES, type Project, type Task } from "@/lib/types";
 
 export default async function ProjectPage({
   params,
@@ -45,8 +46,27 @@ export default async function ProjectPage({
   const activePeople = people.filter((x) => x.active);
   const milestoneGroups = groupByMilestone(list, today);
   const next = milestoneGroups.find((g) => g.milestone.status !== "done");
-  const byOpenFirst = (a: Task, b: Task) => Number(a.status === "done") - Number(b.status === "done");
-  const ungrouped = list.filter((t) => !t.is_milestone && !t.milestone_id).sort(byOpenFirst);
+  const tf = parseTaskFilters(query);
+  const tFiltered = hasTaskFilters(tf);
+  const matches = (t: Task) => taskMatches(t, tf, me.id, today);
+  const byColumn = compareTasks(tf, people);
+  const ungrouped = list.filter((t) => !t.is_milestone && !t.milestone_id && matches(t)).sort(byColumn);
+  const listGroups = milestoneGroups
+    .map((g) => ({ ...g, shown: g.tasks.filter(matches).sort(byColumn) }))
+    .filter((g) => !tFiltered || g.shown.length > 0 || matches(g.milestone));
+  const listHref = (override: Parameters<typeof taskFiltersQS>[1]) => `${here}${taskFiltersQS(tf, override)}`;
+  const sortHead = (key: TaskSort, label: string) => {
+    const active = tf.sort === key;
+    const dir = active && tf.dir === "asc" ? "desc" : "asc";
+    return (
+      <th className="table-head" aria-sort={active ? (tf.dir === "asc" ? "ascending" : "descending") : undefined}>
+        <Link href={listHref({ sort: key, dir })} scroll={false} className="inline-flex items-center gap-1 hover:text-stone-900">
+          {label}
+          {active && <span aria-hidden="true">{tf.dir === "asc" ? "▲" : "▼"}</span>}
+        </Link>
+      </th>
+    );
+  };
 
   const view = sp(query.view) === "board" ? "board" : "list";
   const who = sp(query.who) === "mine" ? "mine" : "all";
@@ -169,7 +189,7 @@ export default async function ProjectPage({
               Tasks <span className="font-normal text-stone-400">· {open.length} open</span>
             </h2>
             <div className="flex items-center gap-2">
-              <a href={`/export/projects/${id}/tasks`} className="rounded-md px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100">
+              <a href={`/export/projects/${id}/tasks${view === "list" ? taskFiltersQS(tf) : ""}`} className="rounded-md px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100">
                 Export CSV
               </a>
               <nav aria-label="Task view" className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5 text-xs font-medium">
@@ -210,16 +230,60 @@ export default async function ProjectPage({
             </div>
           ) : (
             <div className="overflow-x-auto">
+              <FilterForm key={taskFiltersQS(tf)} className="flex flex-wrap items-end gap-2 border-b border-stone-100 px-4 py-3">
+                {tf.sort !== "due" && <input type="hidden" name="sort" value={tf.sort} />}
+                {tf.dir !== "asc" && <input type="hidden" name="dir" value={tf.dir} />}
+                <div>
+                  <label className="label" htmlFor="f_assignee">Assignee</label>
+                  <select id="f_assignee" name="assignee" defaultValue={tf.assignee} className="input py-1.5">
+                    <option value="">Everyone</option>
+                    <option value="me">Mine</option>
+                    <option value="none">Unassigned</option>
+                    {people
+                      .filter((x) => x.id !== me.id && list.some((t) => t.assignee_id === x.id))
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>{x.full_name}</option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="f_task_status">Status</label>
+                  <select id="f_task_status" name="status" defaultValue={tf.status} className="input py-1.5">
+                    <option value="">Any status</option>
+                    {TASK_STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 pb-2 text-sm text-stone-700">
+                  <input type="checkbox" name="overdue" value="1" defaultChecked={tf.overdue} /> Overdue only
+                </label>
+                {tFiltered && (
+                  <Link href={listHref({ assignee: "", status: "", overdue: false })} scroll={false} className="btn py-1.5">
+                    Clear filters
+                  </Link>
+                )}
+              </FilterForm>
               <table className="w-full min-w-[560px]">
                 <thead>
                   <tr>
                     <th className="table-head">Task</th>
-                    <th className="table-head">Assignee</th>
-                    <th className="table-head">Due</th>
-                    <th className="table-head">Status</th>
+                    {sortHead("assignee", "Assignee")}
+                    {sortHead("due", "Due")}
+                    {sortHead("status", "Status")}
                   </tr>
                 </thead>
-                {milestoneGroups.map((g) => {
+                {tFiltered && listGroups.length === 0 && ungrouped.length === 0 && (
+                  <tbody>
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-stone-500">
+                        No tasks match these filters.{" "}
+                        <Link href={listHref({ assignee: "", status: "", overdue: false })} scroll={false} className="link">Clear filters</Link>
+                      </td>
+                    </tr>
+                  </tbody>
+                )}
+                {listGroups.map((g) => {
                   const m = g.milestone;
                   const canChange = canChangeStatus(me, m);
                   return (
@@ -249,7 +313,7 @@ export default async function ProjectPage({
                           )}
                         </td>
                       </tr>
-                      {[...g.tasks].sort(byOpenFirst).map((t) => taskRow(t, true))}
+                      {g.shown.map((t) => taskRow(t, true))}
                     </tbody>
                   );
                 })}

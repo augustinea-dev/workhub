@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LiveRefresh, TaskStatusSelect } from "@/components/client";
+import { FilterForm, LiveRefresh, TaskStatusSelect } from "@/components/client";
 import { Empty, Flash, PageHeader } from "@/components/ui";
 import { addDays, formatDate, todayISO, weekStart } from "@/lib/dates";
 import { sp } from "@/lib/data";
@@ -14,7 +14,7 @@ type Row = {
   due_date: string | null;
   version: number;
   is_milestone: boolean;
-  project: { id: string; name: string; company: { name: string } | null } | null;
+  project: { id: string; name: string; company: { id: string; name: string } | null } | null;
 };
 
 export default async function MyWorkPage({
@@ -31,7 +31,7 @@ export default async function MyWorkPage({
   const [{ data: tasks }, { data: hours }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, status, due_date, version, is_milestone, project:projects(id, name, company:companies(name))")
+      .select("id, title, status, due_date, version, is_milestone, project:projects(id, name, company:companies(id, name))")
       .eq("assignee_id", me.id)
       .neq("status", "done")
       .order("due_date", { ascending: true, nullsFirst: false }),
@@ -43,7 +43,19 @@ export default async function MyWorkPage({
       .lte("work_date", addDays(monday, 6)),
   ]);
 
-  const rows = (tasks ?? []) as unknown as Row[];
+  const mine = (tasks ?? []) as unknown as Row[];
+  const projectFilter = sp(params.project) ?? "";
+  const clientFilter = sp(params.client) ?? "";
+  const rows = mine.filter(
+    (t) => (!projectFilter || t.project?.id === projectFilter) && (!clientFilter || t.project?.company?.id === clientFilter),
+  );
+  const filtered = !!projectFilter || !!clientFilter;
+  const projectOptions = [...new Map(mine.filter((t) => t.project).map((t) => [t.project!.id, t.project!.name])).entries()].sort(
+    (a, b) => a[1].localeCompare(b[1]),
+  );
+  const clientOptions = [
+    ...new Map(mine.filter((t) => t.project?.company).map((t) => [t.project!.company!.id, t.project!.company!.name])).entries(),
+  ].sort((a, b) => a[1].localeCompare(b[1]));
   const weekHours = (hours ?? []).reduce((s, h) => s + Number(h.hours), 0);
   const endOfWeek = addDays(monday, 6);
 
@@ -57,7 +69,7 @@ export default async function MyWorkPage({
   return (
     <>
       <LiveRefresh subs={[{ table: "tasks", filter: `assignee_id=eq.${me.id}` }]} />
-      <PageHeader title={`Hi, ${me.full_name.split(" ")[0]}`} subtitle={`${rows.length} open tasks assigned to you`}>
+      <PageHeader title={`Hi, ${me.full_name.split(" ")[0]}`} subtitle={filtered ? `${rows.length} of ${mine.length} open tasks assigned to you` : `${mine.length} open tasks assigned to you`}>
         <Link href="/time" className="card px-4 py-3 text-right hover:bg-stone-50">
           <span className="block text-xs uppercase tracking-wide text-stone-500">Logged this week</span>
           <span className="text-xl font-semibold">{weekHours.toFixed(1)} h</span>
@@ -65,10 +77,44 @@ export default async function MyWorkPage({
       </PageHeader>
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
+      {projectOptions.length > 1 && (
+        <FilterForm key={`${projectFilter}-${clientFilter}`} className="mb-4 flex flex-wrap items-end gap-2">
+          <div>
+            <label className="label" htmlFor="f_project">Project</label>
+            <select id="f_project" name="project" defaultValue={projectFilter} className="input">
+              <option value="">All projects</option>
+              {projectOptions.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+          </div>
+          {clientOptions.length > 1 && (
+            <div>
+              <label className="label" htmlFor="f_client">Client</label>
+              <select id="f_client" name="client" defaultValue={clientFilter} className="input">
+                <option value="">All clients</option>
+                {clientOptions.map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {filtered && <Link href="/" className="btn">Clear filters</Link>}
+        </FilterForm>
+      )}
+
       {rows.length === 0 ? (
         <div className="card">
           <Empty>
-            Nothing assigned to you. <Link href="/projects" className="link">Browse projects</Link>
+            {filtered ? (
+              <>
+                None of your open tasks match these filters. <Link href="/" className="link">Clear filters</Link>
+              </>
+            ) : (
+              <>
+                Nothing assigned to you. <Link href="/projects" className="link">Browse projects</Link>
+              </>
+            )}
           </Empty>
         </div>
       ) : (

@@ -17,6 +17,16 @@ Everyone can see all projects and tasks. There is no client access: Workhub is s
 - **Admins:** invite new people from the Supabase dashboard (Authentication, Users, Invite user). They appear on the Admin page as a User after they accept.
 - People marked inactive can't sign in.
 
+## Finding things: filters and sorting
+
+Filters live in the page address, so a filtered view can be bookmarked or shared, and Back works. Dropdowns apply as soon as you change them; search applies when you press Enter. **Clear filters** resets the view. Exports download exactly what you've filtered to.
+
+- **Everyone:**
+  - **Projects:** search by project or client name; filter by Status (Open, All, or one status), Client (including "No client") and Owner (including "No owner"). Click the Project, Client, Next milestone or Due column headings to sort; click again to reverse.
+  - **A project's list view:** filter by Assignee (Everyone, Mine, Unassigned, or a person), Status, and Overdue only. Sort by Assignee, Due or Status from the column headings. Tasks stay grouped under their milestones, and done tasks stay at the bottom unless you sort by status.
+  - **My Work:** filter your tasks by project or client (shown once your tasks span more than one project).
+- **Admins:** same as everyone.
+
 ## My Work (home page)
 
 **Where:** My Work in the sidebar.

@@ -117,3 +117,40 @@ export function LiveRefresh({
 
   return null;
 }
+
+/**
+ * A GET filter form: selects and checkboxes apply as soon as they change, text applies on Enter.
+ * Empty fields are left out of the address so links stay short.
+ */
+export function FilterForm({ children, className }: { children: React.ReactNode; className?: string }) {
+  const router = useRouter();
+  const path = usePathname();
+  const formRef = useRef<HTMLFormElement>(null);
+  const go = () => {
+    const form = formRef.current;
+    if (!form) return;
+    const qs = new URLSearchParams();
+    new FormData(form).forEach((v, k) => {
+      if (typeof v === "string" && v.trim()) qs.set(k, v.trim());
+    });
+    const s = qs.toString();
+    router.push(s ? `${path}?${s}` : path, { scroll: false });
+  };
+  return (
+    <form
+      ref={formRef}
+      method="get"
+      className={className}
+      onSubmit={(e) => {
+        e.preventDefault();
+        go();
+      }}
+      onChange={(e) => {
+        const el = e.target as unknown as HTMLInputElement;
+        if (el.tagName === "SELECT" || el.type === "checkbox") go();
+      }}
+    >
+      {children}
+    </form>
+  );
+}

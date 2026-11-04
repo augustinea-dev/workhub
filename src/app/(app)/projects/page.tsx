@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { createProject } from "../actions";
-import { LiveRefresh, SubmitButton } from "@/components/client";
+import { FilterForm, LiveRefresh, SubmitButton } from "@/components/client";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge } from "@/components/ui";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
+import {
+  filterAndSortProjects,
+  hasProjectFilters,
+  parseProjectFilters,
+  projectFiltersQS,
+  type ProjectSort,
+} from "@/lib/list-filters";
 import { nextMilestone } from "@/lib/milestones";
 import { getCompanies, getPeople, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import type { ProjectStatus, TaskStatus } from "@/lib/types";
+import { PROJECT_STATUSES, type ProjectStatus, type TaskStatus } from "@/lib/types";
 
 type Row = {
   id: string;
@@ -15,6 +22,7 @@ type Row = {
   status: ProjectStatus;
   due_date: string | null;
   owner_id: string | null;
+  company_id: string | null;
   company: { name: string } | null;
   tasks: {
     id: string;
@@ -32,15 +40,13 @@ export default async function ProjectsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const show = sp(params.show) === "all" ? "all" : "open";
+  const f = parseProjectFilters(params);
   const me = await requireProfile();
   const supabase = await createClient();
 
-  let query = supabase
+  const query = supabase
     .from("projects")
-    .select("id, name, status, due_date, owner_id, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id)")
-    .order("due_date", { ascending: true, nullsFirst: false });
-  if (show === "open") query = query.not("status", "in", "(complete,cancelled)");
+    .select("id, name, status, due_date, owner_id, company_id, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id)");
 
   const [{ data }, people, companies, { data: templateData }] = await Promise.all([
     query,
@@ -51,18 +57,29 @@ export default async function ProjectsPage({
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
   ]);
   const templates = templateData ?? [];
-  const rows = (data ?? []) as unknown as Row[];
   const today = todayISO();
+  const all = (data ?? []) as unknown as Row[];
+  const rows = filterAndSortProjects(all, f, today);
+  const filtered = hasProjectFilters(f);
+  const owners = people.filter((p) => all.some((r) => r.owner_id === p.id));
+  const sortHead = (key: ProjectSort, label: string) => {
+    const active = f.sort === key;
+    const dir = active && f.dir === "asc" ? "desc" : "asc";
+    return (
+      <th className="table-head" aria-sort={active ? (f.dir === "asc" ? "ascending" : "descending") : undefined}>
+        <Link href={`/projects${projectFiltersQS(f, { sort: key, dir })}`} className="inline-flex items-center gap-1 hover:text-stone-900">
+          {label}
+          {active && <span aria-hidden="true">{f.dir === "asc" ? "▲" : "▼"}</span>}
+        </Link>
+      </th>
+    );
+  };
 
   return (
     <>
       <LiveRefresh subs={[{ table: "tasks" }]} />
-      <PageHeader title="Projects" subtitle={`${rows.length} ${show === "open" ? "open" : "total"}`}>
-        <div className="flex gap-2 text-sm">
-          <Link href="/projects" className={show === "open" ? "btn-primary" : "btn"}>Open</Link>
-          <Link href="/projects?show=all" className={show === "all" ? "btn-primary" : "btn"}>All</Link>
-          <a href={`/export/projects?show=${show}`} className="btn">Export CSV</a>
-        </div>
+      <PageHeader title="Projects" subtitle={`${rows.length} ${filtered ? "matching" : "open"}`}>
+        <a href={`/export/projects${projectFiltersQS(f)}`} className="btn">Export CSV</a>
       </PageHeader>
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
@@ -125,20 +142,73 @@ export default async function ProjectsPage({
       </details>
       )}
 
+      <FilterForm key={projectFiltersQS(f)} className="mb-4 flex flex-wrap items-end gap-2">
+        {f.sort !== "due" && <input type="hidden" name="sort" value={f.sort} />}
+        {f.dir !== "asc" && <input type="hidden" name="dir" value={f.dir} />}
+        <div className="min-w-48 flex-1">
+          <label className="label" htmlFor="q">Search</label>
+          <input id="q" name="q" type="search" defaultValue={f.q} placeholder="Project or client, press Enter" className="input w-full" />
+        </div>
+        <div>
+          <label className="label" htmlFor="f_status">Status</label>
+          <select id="f_status" name="status" defaultValue={f.status === "open" ? "" : f.status} className="input">
+            <option value="">Open</option>
+            <option value="all">All</option>
+            {PROJECT_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label} only</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="f_client">Client</label>
+          <select id="f_client" name="client" defaultValue={f.client} className="input">
+            <option value="">Any client</option>
+            <option value="none">No client</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="f_owner">Owner</label>
+          <select id="f_owner" name="owner" defaultValue={f.owner} className="input">
+            <option value="">Anyone</option>
+            <option value="none">No owner</option>
+            {owners.map((p) => (
+              <option key={p.id} value={p.id}>{p.id === me.id ? "You" : p.full_name}</option>
+            ))}
+          </select>
+        </div>
+        {filtered && (
+          <Link href={`/projects${projectFiltersQS(f, { status: "open", client: "", owner: "", q: "" })}`} className="btn">
+            Clear filters
+          </Link>
+        )}
+      </FilterForm>
+
       <div className="card overflow-x-auto">
         {rows.length === 0 ? (
-          <Empty>No projects yet.</Empty>
+          <Empty>
+            {filtered ? (
+              <>
+                No projects match these filters.{" "}
+                <Link href="/projects" className="link">Clear filters</Link>
+              </>
+            ) : (
+              "No projects yet."
+            )}
+          </Empty>
         ) : (
           <table className="w-full min-w-[820px]">
             <thead>
               <tr>
-                <th className="table-head">Project</th>
-                <th className="table-head">Client</th>
+                {sortHead("name", "Project")}
+                {sortHead("client", "Client")}
                 <th className="table-head">Owner</th>
                 <th className="table-head">Status</th>
-                <th className="table-head">Next milestone</th>
+                {sortHead("milestone", "Next milestone")}
                 <th className="table-head">Open tasks</th>
-                <th className="table-head">Due</th>
+                {sortHead("due", "Due")}
               </tr>
             </thead>
             <tbody>
