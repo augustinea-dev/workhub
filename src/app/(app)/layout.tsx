@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { NavLink } from "@/components/client";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -14,9 +15,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen md:flex">
       <aside className="border-b border-stone-200 bg-stone-100 md:sticky md:top-0 md:h-screen md:w-56 md:shrink-0 md:border-b-0 md:border-r">
-        <div className="flex items-center justify-between px-4 py-4 md:block">
-          <p className="text-lg font-semibold">Workhub</p>
-          <p className="hidden text-xs text-stone-500 md:block">Augustine Agency</p>
+        <div className="flex items-center gap-2.5 px-4 py-4">
+          <Image src="/augustine-mark.png" alt="" width={28} height={28} priority className="shrink-0" />
+          <div>
+            <p className="text-lg font-semibold leading-tight">Workhub</p>
+            <p className="hidden text-xs text-stone-500 md:block">Augustine Agency</p>
+          </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-2 pb-3 md:flex-col md:pb-0">
           <NavLink href="/">My Work</NavLink>
@@ -29,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <span className="ml-2 rounded-full bg-blue-700 px-2 text-xs font-semibold text-white">{unread}</span>
             )}
           </NavLink>
+          {me.role === "admin" && <NavLink href="/templates">Templates</NavLink>}
           {me.role === "admin" && <NavLink href="/admin">Admin</NavLink>}
         </nav>
         <div className="hidden border-t border-stone-200 px-4 py-4 md:absolute md:bottom-0 md:block md:w-56">
