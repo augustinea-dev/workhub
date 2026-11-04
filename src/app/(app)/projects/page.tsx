@@ -61,6 +61,7 @@ export default async function ProjectsPage({
         <div className="flex gap-2 text-sm">
           <Link href="/projects" className={show === "open" ? "btn-primary" : "btn"}>Open</Link>
           <Link href="/projects?show=all" className={show === "all" ? "btn-primary" : "btn"}>All</Link>
+          <a href={`/export/projects?show=${show}`} className="btn">Export CSV</a>
         </div>
       </PageHeader>
       <Flash error={sp(params.error)} notice={sp(params.notice)} />

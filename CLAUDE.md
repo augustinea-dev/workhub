@@ -82,6 +82,6 @@ npm run lint
 
 ## Next up (MVP)
 
-Email notifications, subtasks UI, list sorting/filters, CSV/Excel export, custom fields, teams/groups, Microsoft (Entra ID) sign-in, Dropbox integration (later phase). Update the Build progress tracker as features land.
+Email notifications, subtasks UI, list sorting/filters, custom fields, teams/groups, Microsoft (Entra ID) sign-in, Dropbox integration (later phase). Update the Build progress tracker as features land.
 
 Open question: should members be able to mark tasks complete when they aren't assigned to them? Currently assigned-only.

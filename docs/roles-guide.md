@@ -115,6 +115,16 @@ Everyone can see all projects and tasks. There is no client access: Workhub is s
   - **Reopen** an approved week to allow changes. An Admin must reopen a week before changing its time.
   - Set each person's **hours per week** on the Admin page (lower it for part-time staff).
 
+## Exports (CSV)
+
+Files open in Excel or Google Sheets.
+
+- **Everyone:**
+  - **Projects:** the **Export CSV** button on the Projects page exports the list you're viewing (Open or All): client, owner, status, dates, next milestone, task counts, hours and billable hours.
+  - **A project's tasks:** the **Export CSV** button on a project page, next to List | Board: type, milestone, parent task, assignee, status, dates, estimate, hours logged and completed date.
+  - **Your time:** **Export to CSV** at the bottom of the Time page. Pick a date range, up to a year. Each row has the date, client, project, task, hours, hour type, billable (yes/no), note and that week's timesheet status.
+- **Admins only:** in the time export, choose one person or **Everyone**.
+
 ## Inbox
 
 **Where:** Inbox in the sidebar (the badge shows unread).
@@ -150,4 +160,4 @@ Everyone can see all projects and tasks. There is no client access: Workhub is s
 - **Live updates:** pages refresh on their own when someone else changes a task, update, timesheet or your inbox.
 - **Safe saves:** if someone else saved first, you'll see a message and nothing is overwritten. Make your change again.
 - **Time zone:** "today" and "this week" use Pacific time.
-- **Not yet available:** email notifications, Microsoft sign-in, file storage (use Dropbox links), CSV/Excel export.
+- **Not yet available:** email notifications, Microsoft sign-in, file storage (use Dropbox links).

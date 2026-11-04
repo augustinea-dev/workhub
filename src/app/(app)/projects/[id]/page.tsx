@@ -168,18 +168,23 @@ export default async function ProjectPage({
             <h2 className="text-sm font-semibold">
               Tasks <span className="font-normal text-stone-400">· {open.length} open</span>
             </h2>
-            <nav aria-label="Task view" className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5 text-xs font-medium">
-              {(["list", "board"] as const).map((v) => (
-                <Link
-                  key={v}
-                  href={viewHref({ view: v })}
-                  aria-current={view === v ? "page" : undefined}
-                  className={`rounded-md px-3 py-1 ${view === v ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"}`}
-                >
-                  {v === "list" ? "List" : "Board"}
-                </Link>
-              ))}
-            </nav>
+            <div className="flex items-center gap-2">
+              <a href={`/export/projects/${id}/tasks`} className="rounded-md px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100">
+                Export CSV
+              </a>
+              <nav aria-label="Task view" className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5 text-xs font-medium">
+                {(["list", "board"] as const).map((v) => (
+                  <Link
+                    key={v}
+                    href={viewHref({ view: v })}
+                    aria-current={view === v ? "page" : undefined}
+                    className={`rounded-md px-3 py-1 ${view === v ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"}`}
+                  >
+                    {v === "list" ? "List" : "Board"}
+                  </Link>
+                ))}
+              </nav>
+            </div>
           </div>
           {list.length === 0 ? (
             <Empty>No tasks yet.{isAdmin && " Add the first one below."}</Empty>

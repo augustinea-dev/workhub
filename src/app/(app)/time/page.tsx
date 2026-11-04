@@ -239,6 +239,35 @@ export default async function TimePage({
           <TimeEntryTable rows={timeRows} meId={me.id} isAdmin={isAdmin} redirectTo={here} second="work" locked={locked} />
         )}
       </div>
+
+      <details className="card mt-6 p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Export to CSV</summary>
+        <form action="/export/time" method="get" className="mt-3 flex flex-wrap items-end gap-2">
+          <div>
+            <label className="label" htmlFor="export_from">From</label>
+            <input id="export_from" name="from" type="date" defaultValue={monday} required className="input" />
+          </div>
+          <div>
+            <label className="label" htmlFor="export_to">To</label>
+            <input id="export_to" name="to" type="date" defaultValue={sunday} required className="input" />
+          </div>
+          {isAdmin && (
+            <div>
+              <label className="label" htmlFor="export_user">Person</label>
+              <select id="export_user" name="user" defaultValue={userId} className="input">
+                <option value="all">Everyone</option>
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>{personOption(p)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <button className="btn-primary">Download CSV</button>
+        </form>
+        <p className="mt-2 text-xs text-stone-500">
+          {isAdmin ? "Up to a year at a time." : "Your own time, up to a year at a time."} Opens in Excel or Google Sheets.
+        </p>
+      </details>
     </>
   );
 }
