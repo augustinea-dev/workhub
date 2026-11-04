@@ -13,6 +13,7 @@ export type BoardCard = {
   version: number;
   isMilestone: boolean;
   milestone: string | null;
+  parent: string | null;
   assignee: string;
   isMine: boolean;
   due: string | null;
@@ -114,6 +115,7 @@ export function Board({ cards }: { cards: BoardCard[] }) {
                     } ${dragId === c.id ? "opacity-50" : ""}`}
                   >
                     {c.milestone && <p className="mb-1 truncate text-xs text-stone-500">◆ {c.milestone}</p>}
+                    {c.parent && <p className="mb-1 truncate text-xs text-stone-500">↳ {c.parent}</p>}
                     <Link
                       href={`/tasks/${c.id}`}
                       draggable={false}

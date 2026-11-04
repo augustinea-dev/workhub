@@ -173,16 +173,19 @@ export async function createTask(fd: FormData) {
   const startDate = optDate(fd, "start_date");
   const dueDate = optDate(fd, "due_date");
   if (startDate && dueDate && startDate > dueDate) fail(back, "Start date can't be after the due date.");
-  const isMilestone = str(fd, "is_milestone") === "on";
+  const parentId = opt(fd, "parent_task_id");
+  const isMilestone = !parentId && str(fd, "is_milestone") === "on";
   const supabase = await createClient();
   const { error } = await supabase.from("tasks").insert({
     project_id: projectId,
+    parent_task_id: parentId,
     title,
     assignee_id: opt(fd, "assignee_id"),
     start_date: startDate,
     due_date: dueDate,
+    estimate_hours: Number.parseFloat(str(fd, "estimate_hours")) >= 0 ? Number.parseFloat(str(fd, "estimate_hours")) : null,
     is_milestone: isMilestone,
-    milestone_id: isMilestone ? null : opt(fd, "milestone_id"),
+    milestone_id: isMilestone || parentId ? null : opt(fd, "milestone_id"),
   });
   if (error) fail(back, error.message);
   done(back, `Added “${title}”.`);

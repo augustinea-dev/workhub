@@ -14,6 +14,7 @@ type Row = {
   due_date: string | null;
   version: number;
   is_milestone: boolean;
+  parent: { id: string; title: string } | null;
   project: { id: string; name: string; company: { id: string; name: string } | null } | null;
 };
 
@@ -31,7 +32,7 @@ export default async function MyWorkPage({
   const [{ data: tasks }, { data: hours }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, status, due_date, version, is_milestone, project:projects(id, name, company:companies(id, name))")
+      .select("id, title, status, due_date, version, is_milestone, project:projects(id, name, company:companies(id, name)), parent:parent_task_id(id, title)")
       .eq("assignee_id", me.id)
       .neq("status", "done")
       .order("due_date", { ascending: true, nullsFirst: false }),
@@ -146,6 +147,7 @@ export default async function MyWorkPage({
                             <p className="truncate text-xs text-stone-500">
                               {t.project?.company?.name ? `${t.project.company.name} · ` : ""}
                               {t.project?.name}
+                              {t.parent && ` › ${t.parent.title}`}
                             </p>
                           </td>
                           <td className={`table-cell whitespace-nowrap ${g.label === "Overdue" ? "font-medium text-red-700" : "text-stone-600"}`}>

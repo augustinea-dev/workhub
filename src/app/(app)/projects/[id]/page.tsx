@@ -50,9 +50,13 @@ export default async function ProjectPage({
   const tFiltered = hasTaskFilters(tf);
   const matches = (t: Task) => taskMatches(t, tf, me.id, today);
   const byColumn = compareTasks(tf, people);
-  const ungrouped = list.filter((t) => !t.is_milestone && !t.milestone_id && matches(t)).sort(byColumn);
+  const kids = new Map<string, Task[]>();
+  for (const t of list) if (t.parent_task_id) kids.set(t.parent_task_id, [...(kids.get(t.parent_task_id) ?? []), t]);
+  const shownKids = (t: Task) => (kids.get(t.id) ?? []).filter(matches).sort(byColumn);
+  const showsUp = (t: Task) => matches(t) || shownKids(t).length > 0;
+  const ungrouped = list.filter((t) => !t.is_milestone && !t.milestone_id && !t.parent_task_id && showsUp(t)).sort(byColumn);
   const listGroups = milestoneGroups
-    .map((g) => ({ ...g, shown: g.tasks.filter(matches).sort(byColumn) }))
+    .map((g) => ({ ...g, shown: g.tasks.filter(showsUp).sort(byColumn) }))
     .filter((g) => !tFiltered || g.shown.length > 0 || matches(g.milestone));
   const listHref = (override: Parameters<typeof taskFiltersQS>[1]) => `${here}${taskFiltersQS(tf, override)}`;
   const sortHead = (key: TaskSort, label: string) => {
@@ -89,12 +93,14 @@ export default async function ProjectPage({
     if (e.task_id) loggedByTask.set(e.task_id, (loggedByTask.get(e.task_id) ?? 0) + Number(e.hours));
   }
   const milestoneTitle = new Map(milestoneGroups.map((g) => [g.milestone.id, g.milestone.title]));
+  const byId = new Map(list.map((t) => [t.id, t]));
+  const milestoneOf = (t: Task) => t.milestone_id ?? (t.parent_task_id ? byId.get(t.parent_task_id)?.milestone_id ?? null : null);
   const byDue = (a: Task, b: Task) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999") || a.sort_order - b.sort_order;
   const byFinished = (a: Task, b: Task) => (b.completed_at ?? "").localeCompare(a.completed_at ?? "");
   const boardCards: BoardCard[] = list
     .filter((t) => who === "all" || t.assignee_id === me.id)
     .filter((t) =>
-      !msFilter ? true : msFilter === "none" ? !t.is_milestone && !t.milestone_id : t.milestone_id === msFilter || t.id === msFilter,
+      !msFilter ? true : msFilter === "none" ? !t.is_milestone && !milestoneOf(t) : milestoneOf(t) === msFilter || t.id === msFilter,
     )
     .sort((a, b) => (a.status === "done" && b.status === "done" ? byFinished(a, b) : byDue(a, b)))
     .map((t) => {
@@ -106,7 +112,8 @@ export default async function ProjectPage({
         status: t.status,
         version: t.version,
         isMilestone: t.is_milestone,
-        milestone: t.milestone_id ? milestoneTitle.get(t.milestone_id) ?? null : null,
+        milestone: milestoneOf(t) ? milestoneTitle.get(milestoneOf(t)!) ?? null : null,
+        parent: t.parent_task_id ? byId.get(t.parent_task_id)?.title ?? null : null,
         assignee: t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id),
         isMine: t.assignee_id === me.id,
         due: t.due_date ? formatDate(t.due_date) : null,
@@ -118,19 +125,26 @@ export default async function ProjectPage({
   const chip = (active: boolean) =>
     `rounded-full px-3 py-1 text-xs font-medium ${active ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`;
 
-  const taskRow = (t: Task, indent: boolean) => {
+  const taskRow = (t: Task, indent: boolean, sub = false) => {
     const late = t.due_date && t.due_date < today && t.status !== "done";
     const canChange = canChangeStatus(me, t);
+    const all = kids.get(t.id) ?? [];
     return (
       <tr key={t.id} className="hover:bg-stone-50">
-        <td className={`table-cell ${indent ? "pl-8" : ""}`}>
+        <td className={`table-cell ${sub ? (indent ? "pl-14" : "pl-9") : indent ? "pl-8" : ""}`}>
+          {sub && <span aria-hidden="true" className="mr-1.5 text-stone-400">↳</span>}
           <Link
             href={`/tasks/${t.id}`}
-            className={`font-medium hover:underline ${t.status === "done" ? "text-stone-400 line-through" : ""}`}
+            className={`hover:underline ${sub ? "" : "font-medium"} ${t.status === "done" ? "text-stone-400 line-through" : ""}`}
           >
             {t.is_milestone && <span title="Milestone">◆ </span>}
             {t.title}
           </Link>
+          {all.length > 0 && (
+            <span className="ml-2 text-xs text-stone-400">
+              {all.filter((k) => k.status === "done").length}/{all.length} subtasks
+            </span>
+          )}
         </td>
         <td className={`table-cell ${t.assignee_id === me.id ? "font-medium" : "text-stone-600"}`}>
           {t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id)}
@@ -313,7 +327,7 @@ export default async function ProjectPage({
                           )}
                         </td>
                       </tr>
-                      {g.shown.map((t) => taskRow(t, true))}
+                      {g.shown.flatMap((t) => [taskRow(t, true), ...shownKids(t).map((k) => taskRow(k, true, true))])}
                     </tbody>
                   );
                 })}
@@ -326,7 +340,10 @@ export default async function ProjectPage({
                         </td>
                       </tr>
                     )}
-                    {ungrouped.map((t) => taskRow(t, milestoneGroups.length > 0))}
+                    {ungrouped.flatMap((t) => [
+                      taskRow(t, milestoneGroups.length > 0),
+                      ...shownKids(t).map((k) => taskRow(k, milestoneGroups.length > 0, true)),
+                    ])}
                   </tbody>
                 )}
               </table>
