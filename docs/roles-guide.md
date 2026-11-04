@@ -69,7 +69,7 @@ Every project name is built from its parts, the same way as in Workfront: **refe
 - **Admins only:**
   - Change the status of any task.
   - **Add a task:** title, assignees, start, due, milestone, and whether the task is itself a milestone.
-  - Edit project details: name, status, owner, client, dates and description.
+  - **Edit project** (in the Project details card): name parts, status, owner, client, dates, cost code and description. Save as template and Delete are in the edit view too.
   - **Save as template:** copies the project's top-level tasks (subtasks are skipped), milestones, estimates and assignees into a new template.
   - Delete the project and its tasks.
 
@@ -101,7 +101,8 @@ A task can have **several people**, like in Workfront.
 - **If you're one of the task's assignees:** a **Your status** bar with one-click To do, In progress, In review and Done.
 - **If it isn't:** a note saying who it's assigned to. You can still post updates and log time.
 - **Admins only:**
-  - Edit everything: title, status, start and due dates, assignees, milestone, estimate, description, and whether it's a milestone.
+  - **Edit task** (in the Details card): title, status, start and due dates, assignees, milestone, estimate, description, and whether it's a milestone.
+  - **+ Add subtask** under the description.
   - Delete the task.
   - Delete updates.
 
@@ -208,6 +209,10 @@ Files open in Excel or Google Sheets.
 - **Recent changes:** the latest changes across Workhub and who made them.
 
 ## Good to know
+
+- **Editing:** everyone sees the same task and project pages. Admins change things with **Edit task** / **Edit project** (top of the Details card), then **Save** or **Cancel**. Clients are edited the same way with **Edit** on each row.
+- **Deleting** always asks first ("Delete this task? This can't be undone."), with **Yes, delete** and **Cancel**. Update Delete buttons only show when you point at an update.
+- **Messages** like "Saved" or an error pop up in the bottom-right corner. Saved messages fade after a few seconds; errors stay until you close them.
 
 - **Live updates:** pages refresh on their own when someone else changes a task, update, timesheet or your inbox.
 - **Safe saves:** if someone else saved first, you'll see a message and nothing is overwritten. Make your change again.

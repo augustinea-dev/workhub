@@ -94,7 +94,20 @@ export function ProjectNameFields({
       </div>
       <p className="rounded-md bg-stone-50 px-3 py-2 text-sm sm:col-span-2" aria-live="polite">
         <span className="text-xs font-medium uppercase tracking-wide text-stone-500">Project name </span>
-        <span className="break-all font-medium text-stone-900">{title.trim() ? preview : "Add a title to see the name"}</span>
+        <span className="break-words font-medium text-stone-900">
+          {title.trim()
+            ? preview.split("_").map((part, i) => (
+                <span key={i}>
+                  {i > 0 && (
+                    <>
+                      _<wbr />
+                    </>
+                  )}
+                  {part}
+                </span>
+              ))
+            : "Add a title to see the name"}
+        </span>
       </p>
     </div>
   );

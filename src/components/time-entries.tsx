@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { deleteTime, updateTime } from "@/app/(app)/actions";
-import { SubmitButton } from "@/components/client";
+import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { HOUR_TYPES, type HourType } from "@/lib/types";
 
 export type TimeRow = {
@@ -169,7 +169,7 @@ function Row({
           <form action={deleteTime} className="mt-2">
             <input type="hidden" name="id" value={r.id} />
             <input type="hidden" name="redirect_to" value={redirectTo} />
-            <button className="btn-danger">Remove this entry</button>
+            <ConfirmDelete question="Remove this time entry?">Remove this entry</ConfirmDelete>
           </form>
         </div>
       )}

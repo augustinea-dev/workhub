@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTemplateTask, deleteTemplate, deleteTemplateTask, updateTemplate, updateTemplateTask } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
-import { SubmitButton } from "@/components/client";
+import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { Empty, Flash } from "@/components/ui";
 import { addWorkingDays, formatDay, isValidISODate, todayISO } from "@/lib/dates";
 import { pickerOptions } from "@/lib/assignees";
@@ -167,7 +167,7 @@ export default async function TemplatePage({
                       <form action={deleteTemplateTask} className="ml-auto">
                         <input type="hidden" name="id" value={task.id} />
                         <input type="hidden" name="template_id" value={id} />
-                        <button className="btn-danger" aria-label={`Remove ${task.title}`}>Remove</button>
+                        <ConfirmDelete question={`Remove “${task.title}”?`}>Remove</ConfirmDelete>
                       </form>
                     </div>
                   </li>
@@ -218,7 +218,7 @@ export default async function TemplatePage({
 
           <form action={deleteTemplate}>
             <input type="hidden" name="id" value={id} />
-            <button className="btn-danger">Delete template</button>
+            <ConfirmDelete question="Delete this template? Projects already made from it stay as they are.">Delete template</ConfirmDelete>
           </form>
         </div>
       </div>

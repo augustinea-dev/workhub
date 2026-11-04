@@ -1,18 +1,11 @@
+import { Toast } from "@/components/client";
 import type { Health } from "@/lib/milestones";
 import type { ProjectStatus, TaskStatus, TimesheetStatus } from "@/lib/types";
 import { PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
 
 export function Flash({ error, notice }: { error?: string; notice?: string }) {
   if (!error && !notice) return null;
-  return error ? (
-    <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-      {error}
-    </div>
-  ) : (
-    <div role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-      {notice}
-    </div>
-  );
+  return <Toast key={`${error ?? ""}|${notice ?? ""}`} error={error} notice={notice} />;
 }
 
 const TASK_TONE: Record<TaskStatus, string> = {

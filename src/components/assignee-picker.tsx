@@ -90,7 +90,7 @@ export function AssigneePicker({
               setOpen(false);
             }
           }}
-          placeholder={picked.length ? "Add someone" : "Unassigned. Type a name to add someone"}
+          placeholder={picked.length ? "Add someone" : "Add people"}
           role="combobox"
           aria-expanded={showList}
           aria-controls={listId}

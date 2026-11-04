@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
@@ -152,5 +152,81 @@ export function FilterForm({ children, className }: { children: React.ReactNode;
     >
       {children}
     </form>
+  );
+}
+
+/**
+ * A delete button that asks in place before submitting its form (no browser dialog).
+ * Put it inside the delete form.
+ */
+export function ConfirmDelete({
+  children = "Delete",
+  question,
+  className = "btn-danger",
+}: {
+  children?: React.ReactNode;
+  question: string;
+  className?: string;
+}) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <button type="button" onClick={() => setAsking(true)} className={className}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <span role="group" aria-label="Confirm delete" className="inline-flex flex-wrap items-center gap-2 text-xs">
+      <span className="font-medium text-stone-800">{question}</span>
+      <SubmitButton
+        pendingText="Deleting…"
+        className="inline-flex items-center rounded-md bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
+      >
+        Yes, delete
+      </SubmitButton>
+      <button
+        type="button"
+        autoFocus
+        onClick={() => setAsking(false)}
+        className="rounded-md px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100"
+      >
+        Cancel
+      </button>
+    </span>
+  );
+}
+
+/**
+ * The ?notice= / ?error= message as a toast in the corner. Notices fade after a few seconds;
+ * errors stay until closed. The parameter is then taken out of the address so a refresh doesn't repeat it.
+ */
+export function Toast({ error, notice }: { error?: string; notice?: string }) {
+  const message = error ?? notice;
+  const [open, setOpen] = useState(!!message);
+  useEffect(() => {
+    setOpen(!!message);
+    if (!message) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("error");
+    url.searchParams.delete("notice");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    if (error) return;
+    const t = setTimeout(() => setOpen(false), 5000);
+    return () => clearTimeout(t);
+  }, [message, error]);
+  if (!open || !message) return null;
+  return (
+    <div
+      role={error ? "alert" : "status"}
+      className={`fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg ${
+        error ? "border-red-200 bg-red-50 text-red-900" : "border-emerald-200 bg-emerald-50 text-emerald-900"
+      }`}
+    >
+      <span className="flex-1">{message}</span>
+      <button type="button" onClick={() => setOpen(false)} aria-label="Dismiss" className="-mr-1 rounded px-1 text-base leading-none opacity-60 hover:opacity-100">
+        ×
+      </button>
+    </div>
   );
 }

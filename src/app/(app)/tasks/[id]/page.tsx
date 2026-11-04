@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteComment, deleteTask, logTime, setTaskStatus, updateTask } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
-import { LiveRefresh, SubmitButton } from "@/components/client";
+import { ConfirmDelete, LiveRefresh, SubmitButton } from "@/components/client";
 import { MentionComposer } from "@/components/mention-composer";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, HealthBadge, TaskBadge } from "@/components/ui";
@@ -50,10 +50,13 @@ function Field({ label, children, wide }: { label: string; children: React.React
   );
 }
 
-function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+function InfoCard({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <section className="card p-4">
-      <h2 className="mb-3 text-sm font-semibold">{title}</h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {action}
+      </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</dl>
     </section>
   );
@@ -147,6 +150,7 @@ export default async function TaskPage({
   const mine = entries.filter((e) => e.user_id === me.id).reduce((s, e) => s + Number(e.hours), 0);
   const estimate = t.estimate_hours != null ? Number(t.estimate_hours) : null;
   const here = `/tasks/${id}`;
+  const editing = isAdmin && sp(query.edit) === "1";
   const today = todayISO();
   const isAssignee = t.assignee_ids.includes(me.id);
   const isDone = t.status === "done";
@@ -161,6 +165,42 @@ export default async function TaskPage({
     personName: nameOf(people, e.user_id),
     dayLabel: formatDay(e.work_date),
   }));
+
+  const addSubtask = (
+    <details className="group/add border-t border-stone-200 bg-stone-50 first:border-t-0">
+      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-blue-700 hover:underline [&::-webkit-details-marker]:hidden">+ Add subtask</summary>
+      <form action={createTask} className="px-4 pb-4">
+        <input type="hidden" name="project_id" value={t.project.id} />
+        <input type="hidden" name="parent_task_id" value={t.id} />
+        <input type="hidden" name="redirect_to" value={here} />
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-48 flex-[2_1_12rem]">
+            <label className="label" htmlFor="sub_title">Title</label>
+            <input id="sub_title" name="title" required placeholder="Subtask title" className="input w-full" />
+          </div>
+          <div className="min-w-48 flex-[2_1_12rem]">
+            <AssigneePicker {...pickerOptions(people)} defaultValue={t.assignee_ids} />
+          </div>
+          <div className="w-40">
+            <label className="label" htmlFor="sub_start">Start</label>
+            <input id="sub_start" name="start_date" type="date" defaultValue={t.start_date ?? ""} className="input w-full" />
+          </div>
+          <div className="w-40">
+            <label className="label" htmlFor="sub_due">Due</label>
+            <input id="sub_due" name="due_date" type="date" defaultValue={t.due_date ?? ""} className="input w-full" />
+          </div>
+          <div className="w-24">
+            <label className="label" htmlFor="sub_hours">Hours</label>
+            <input id="sub_hours" name="estimate_hours" type="number" step="0.25" min="0" className="input w-full" />
+          </div>
+          <SubmitButton pendingText="Adding…" className="btn-primary shrink-0">Add subtask</SubmitButton>
+        </div>
+        <p className="mt-2 text-xs text-stone-500">
+          Dates start as this task&apos;s. Once subtasks have dates or hours, this task&apos;s start, due and planned hours are calculated from them.
+        </p>
+      </form>
+    </details>
+  );
 
   const dueText = t.due_date ? (
     <span className={overdue ? "font-medium text-red-700" : undefined}>
@@ -210,10 +250,10 @@ export default async function TaskPage({
       </p>
       <Flash error={sp(query.error)} notice={sp(query.notice)} />
 
-      {!isAdmin && canChangeStatus(me, t) && (
+      {canChangeStatus(me, t) && !editing && (
         <section className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <h2 className="text-sm font-semibold">Your status</h2>
+            <h2 className="text-sm font-semibold">{isAssignee ? "Your status" : "Status"}</h2>
             <p className="text-xs text-stone-500">Keep this current so the team knows where things stand.</p>
           </div>
           <div role="group" aria-label="Task status" className="flex flex-wrap gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1">
@@ -251,14 +291,14 @@ export default async function TaskPage({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-6">
-          {!isAdmin && (
+          {!editing && (
             <section className="card p-4">
               <h2 className="mb-2 text-sm font-semibold">Description</h2>
               {t.description ? (
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-800">{t.description}</p>
               ) : (
                 <p className="text-sm text-stone-500">
-                  No description yet. If you need more detail, ask in Updates below.
+                  {isAdmin ? "No description yet. Use Edit task to add one." : "No description yet. If you need more detail, ask in Updates below."}
                 </p>
               )}
             </section>
@@ -296,7 +336,7 @@ export default async function TaskPage({
             </div>
           )}
 
-          {canHaveSubtasks && (subtasks.length > 0 || isAdmin) && (
+          {canHaveSubtasks && subtasks.length > 0 && (
             <section className="card overflow-hidden">
               <div className="border-b border-stone-200 px-4 py-3">
                 <h2 className="text-sm font-semibold">
@@ -318,9 +358,7 @@ export default async function TaskPage({
                   </div>
                 )}
               </div>
-              {subtasks.length === 0 ? (
-                <Empty>No subtasks yet. Break this task into steps below.</Empty>
-              ) : (
+              {(
                 <ul>
                   {subtasks.map((s) => {
                     const done = s.status === "done";
@@ -374,29 +412,11 @@ export default async function TaskPage({
                   })}
                 </ul>
               )}
-              {isAdmin && (
-                <form action={createTask} className="border-t border-stone-200 bg-stone-50 p-4">
-                  <input type="hidden" name="project_id" value={t.project.id} />
-                  <input type="hidden" name="parent_task_id" value={t.id} />
-                  <input type="hidden" name="redirect_to" value={here} />
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Add a subtask</p>
-                  <div className="flex flex-wrap items-end gap-2">
-                    <input name="title" required placeholder="Subtask title" aria-label="Subtask title" className="input min-w-48 flex-1" />
-                    <div className="w-72">
-                      <AssigneePicker {...pickerOptions(people)} defaultValue={t.assignee_ids} />
-                    </div>
-                    <input name="start_date" type="date" defaultValue={t.start_date ?? ""} aria-label="Start date" className="input w-40" />
-                    <input name="due_date" type="date" defaultValue={t.due_date ?? ""} aria-label="Due date" className="input w-40" />
-                    <input name="estimate_hours" type="number" step="0.25" min="0" placeholder="Hours" aria-label="Planned hours" className="input w-24" />
-                    <SubmitButton pendingText="Adding…" className="btn-primary shrink-0">Add subtask</SubmitButton>
-                  </div>
-                  <p className="mt-2 text-xs text-stone-500">
-                    Dates start as this task&apos;s. Once subtasks have dates or hours, this task&apos;s start, due and planned hours are calculated from them.
-                  </p>
-                </form>
-              )}
+              {isAdmin && addSubtask}
             </section>
           )}
+
+          {canHaveSubtasks && subtasks.length === 0 && isAdmin && <section className="card overflow-hidden">{addSubtask}</section>}
 
           <section className="card">
             <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
@@ -407,17 +427,17 @@ export default async function TaskPage({
             ) : (
               <ul>
                 {thread.map((c) => (
-                  <li key={c.id} className="border-b border-stone-100 px-4 py-3">
+                  <li key={c.id} className="group border-b border-stone-100 px-4 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">
                         {c.author_id === me.id ? "You" : nameOf(people, c.author_id)}
                         <span className="ml-2 font-normal text-stone-400">{formatTimestamp(c.created_at)}</span>
                       </p>
                       {isAdmin && (
-                        <form action={deleteComment}>
+                        <form action={deleteComment} className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                           <input type="hidden" name="id" value={c.id} />
                           <input type="hidden" name="task_id" value={id} />
-                          <button className="btn-danger" aria-label="Delete comment">Delete</button>
+                          <ConfirmDelete question="Delete this update?" />
                         </form>
                       )}
                     </div>
@@ -471,9 +491,12 @@ export default async function TaskPage({
         </div>
 
         <div className="space-y-6">
-          {isAdmin ? (
+          {editing ? (
             <section className="card h-fit p-4">
-              <h2 className="mb-3 text-sm font-semibold">Details</h2>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">Edit task</h2>
+                <Link href={here} className="text-xs font-medium text-stone-500 hover:text-stone-900">Cancel</Link>
+              </div>
               <form action={updateTask} className="space-y-3">
                 <input type="hidden" name="id" value={id} />
                 <input type="hidden" name="version" value={t.version} />
@@ -533,19 +556,37 @@ export default async function TaskPage({
                     <input type="checkbox" name="is_milestone" defaultChecked={t.is_milestone} /> This task is a milestone
                   </label>
                 )}
-                <SubmitButton>Save task</SubmitButton>
+                <div className="flex items-center gap-2">
+                  <SubmitButton>Save task</SubmitButton>
+                  <Link href={here} className="btn">Cancel</Link>
+                </div>
               </form>
               <form action={deleteTask} className="mt-4 border-t border-stone-100 pt-3">
                 <input type="hidden" name="id" value={id} />
                 <input type="hidden" name="project_id" value={t.project.id} />
-                <button className="btn-danger">
+                <ConfirmDelete
+                  question={
+                    subtasks.length
+                      ? `Delete this task and its ${subtasks.length} subtask${subtasks.length === 1 ? "" : "s"}? This can't be undone.`
+                      : "Delete this task? This can't be undone."
+                  }
+                >
                   {subtasks.length ? `Delete task and its ${subtasks.length} subtask${subtasks.length === 1 ? "" : "s"}` : "Delete task"}
-                </button>
+                </ConfirmDelete>
               </form>
             </section>
           ) : (
             <>
-              <InfoCard title="Details">
+              <InfoCard
+                title="Details"
+                action={
+                  isAdmin && (
+                    <Link href={`${here}?edit=1`} className="btn px-2.5 py-1 text-xs">
+                      Edit task
+                    </Link>
+                  )
+                }
+              >
                 <Field label="Project" wide>
                   <Link href={`/projects/${t.project.id}`} className="link">{t.project.name}</Link>
                 </Field>
@@ -593,7 +634,7 @@ export default async function TaskPage({
               <div className="col-span-2">
                 <div
                   role="progressbar"
-                  aria-label="Hours loggedTotal against plan"
+                  aria-label="Hours logged against plan"
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={Math.round(Math.min(100, (loggedTotal / estimate) * 100))}

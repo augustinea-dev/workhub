@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { decideTimesheet, logTime, recallTimesheet, reopenTimesheet, submitTimesheet } from "../actions";
-import { SubmitButton } from "@/components/client";
+import { FilterForm, SubmitButton } from "@/components/client";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, PageHeader, TimesheetBadge } from "@/components/ui";
 import { addDays, formatDate, formatDay, formatTimestamp, isValidISODate, todayISO, weekStart } from "@/lib/dates";
@@ -73,35 +73,39 @@ export default async function TimePage({
 
   return (
     <>
-      <PageHeader
-        title="Time"
-        subtitle={`Week of ${formatDate(monday)} – ${formatDate(sunday)} · ${userId === me.id ? "You" : nameOf(people, userId)}`}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          {isAdmin && (
-            <Link href="/time/approvals" className="btn">
-              Approvals
-              {!!waiting && (
-                <span className="ml-2 rounded-full bg-blue-700 px-2 text-xs font-semibold text-white">{waiting}</span>
-              )}
+      <PageHeader title="Time" subtitle={userId === me.id ? "Your hours, week by week" : `Viewing ${nameOf(people, userId)}'s hours`}>
+        {isAdmin && (
+          <Link href="/time/approvals" className="btn">
+            Approvals
+            {!!waiting && <span className="ml-2 rounded-full bg-blue-700 px-2 text-xs font-semibold text-white">{waiting}</span>}
+          </Link>
+        )}
+      </PageHeader>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <nav aria-label="Week" className="flex items-center gap-1">
+          <Link href={qs(addDays(monday, -7))} className="btn px-2.5" aria-label="Previous week">←</Link>
+          <span className="min-w-44 text-center text-sm font-semibold">
+            {formatDate(monday)} to {formatDate(sunday)}
+          </span>
+          <Link href={qs(addDays(monday, 7))} className="btn px-2.5" aria-label="Next week">→</Link>
+          {monday !== weekStart(todayISO()) && (
+            <Link href={qs(weekStart(todayISO()))} className="ml-2 text-sm font-medium text-blue-700 hover:underline">
+              Back to this week
             </Link>
           )}
-          <Link href={qs(addDays(monday, -7))} className="btn" aria-label="Previous week">←</Link>
-          <Link href={qs(weekStart(todayISO()))} className="btn">This week</Link>
-          <Link href={qs(addDays(monday, 7))} className="btn" aria-label="Next week">→</Link>
-          {isAdmin && (
-            <form className="flex gap-2">
-              <input type="hidden" name="week" value={monday} />
-              <select name="user" defaultValue={userId} className="input" aria-label="Person">
-                {people.map((p) => (
-                  <option key={p.id} value={p.id}>{personOption(p)}</option>
-                ))}
-              </select>
-              <button className="btn">View</button>
-            </form>
-          )}
-        </div>
-      </PageHeader>
+        </nav>
+        {isAdmin && (
+          <FilterForm key={userId} className="flex items-center gap-2">
+            <input type="hidden" name="week" value={monday} />
+            <label htmlFor="time_person" className="text-xs font-medium uppercase tracking-wide text-stone-500">Person</label>
+            <select id="time_person" name="user" defaultValue={userId} className="input w-72">
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>{personOption(p)}</option>
+              ))}
+            </select>
+          </FilterForm>
+        )}
+      </div>
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
       <section className="card mb-6 flex flex-wrap items-center justify-between gap-4 p-4">

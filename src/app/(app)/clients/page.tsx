@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createCompany, deleteCompany, updateCompany } from "../actions";
-import { SubmitButton } from "@/components/client";
+import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { Empty, Flash, PageHeader } from "@/components/ui";
 import { sp } from "@/lib/data";
 import { MONTHS } from "@/lib/naming";
@@ -34,13 +34,14 @@ export default async function ClientsPage({
   const params = await searchParams;
   const me = await requireProfile();
   const isAdmin = me.role === "admin";
+  const editId = isAdmin ? sp(params.edit) : undefined;
   const supabase = await createClient();
   const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month, projects(id, status)").order("name");
   const rows = (data ?? []) as unknown as Row[];
 
   return (
     <>
-      <PageHeader title="Clients" subtitle={`${rows.length} clients`} />
+      <PageHeader title="Clients" subtitle={`${rows.length} client${rows.length === 1 ? "" : "s"}`} />
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
       {isAdmin && (
@@ -75,51 +76,60 @@ export default async function ClientsPage({
               </tr>
             </thead>
             <tbody>
-              {rows.map((c) => (
-                <tr key={c.id}>
-                  <td className="table-cell">
-                    {isAdmin ? (
-                      <form action={updateCompany} className="flex flex-wrap items-center gap-2">
+              {rows.map((c) =>
+                editId === c.id ? (
+                  <tr key={c.id} className="bg-stone-50">
+                    <td colSpan={4} className="table-cell">
+                      <form action={updateCompany} className="flex flex-wrap items-end gap-2">
                         <input type="hidden" name="id" value={c.id} />
-                        <input name="name" required defaultValue={c.name} aria-label={`Name for ${c.name}`} className="input min-w-48 py-1.5" />
-                        <input
-                          name="project_label"
-                          defaultValue={c.project_label ?? ""}
-                          placeholder="Name on projects"
-                          aria-label={`Name on projects for ${c.name}`}
-                          className="input min-w-40 py-1.5"
-                        />
-                        <YearSelect id={`year_${c.id}`} value={c.fiscal_year_start_month} />
-                        <SubmitButton className="btn py-1.5" pendingText="Saving…">Save</SubmitButton>
-                        <Link href={`/projects?client=${c.id}&status=all`} className="text-xs font-medium text-stone-500 hover:underline">
-                          View projects
-                        </Link>
+                        <div className="min-w-48 flex-1">
+                          <label className="label" htmlFor={`name_${c.id}`}>Client (legal billing name)</label>
+                          <input id={`name_${c.id}`} name="name" required defaultValue={c.name} className="input w-full" />
+                        </div>
+                        <div className="min-w-40 flex-1">
+                          <label className="label" htmlFor={`label_${c.id}`}>Name on projects</label>
+                          <input id={`label_${c.id}`} name="project_label" defaultValue={c.project_label ?? ""} placeholder="Same as client" className="input w-full" />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor={`year_${c.id}`}>Billing year</label>
+                          <YearSelect id={`year_${c.id}`} value={c.fiscal_year_start_month} />
+                        </div>
+                        <SubmitButton pendingText="Saving…">Save</SubmitButton>
+                        <Link href="/clients" className="btn">Cancel</Link>
                       </form>
-                    ) : (
-                      <>
-                        <Link href={`/projects?client=${c.id}&status=all`} className="font-medium hover:underline">{c.name}</Link>
-                        {c.project_label && <span className="ml-2 text-xs text-stone-500">Projects named “{c.project_label}”</span>}
-                      </>
-                    )}
-                  </td>
-                  <td className="table-cell text-stone-600">
-                    {c.projects.filter((p) => !["complete", "cancelled"].includes(p.status)).length}
-                  </td>
-                  <td className="table-cell text-stone-600">{c.projects.length}</td>
-                  {isAdmin && (
-                    <td className="table-cell text-right">
-                      {c.projects.length === 0 ? (
-                        <form action={deleteCompany}>
-                          <input type="hidden" name="id" value={c.id} />
-                          <button className="btn-danger" aria-label={`Delete ${c.name}`}>Delete</button>
-                        </form>
-                      ) : (
-                        <span className="text-xs text-stone-400" title="Move or delete its projects first">Has projects</span>
-                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                  </tr>
+                ) : (
+                  <tr key={c.id} className="hover:bg-stone-50">
+                    <td className="table-cell">
+                      <Link href={`/projects?client=${c.id}&status=all`} className="font-medium hover:underline">{c.name}</Link>
+                      <p className="mt-0.5 text-xs text-stone-500">
+                        {c.project_label ? `Projects named “${c.project_label}” · ` : ""}
+                        {c.fiscal_year_start_month ? `Fiscal year from ${MONTHS[c.fiscal_year_start_month - 1]}` : "Calendar year"}
+                      </p>
+                    </td>
+                    <td className="table-cell text-stone-600">
+                      {c.projects.filter((p) => !["complete", "cancelled"].includes(p.status)).length}
+                    </td>
+                    <td className="table-cell text-stone-600">{c.projects.length}</td>
+                    {isAdmin && (
+                      <td className="table-cell">
+                        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                          <Link href={`/clients?edit=${c.id}`} className="btn px-2.5 py-1 text-xs">Edit</Link>
+                          {c.projects.length === 0 ? (
+                            <form action={deleteCompany}>
+                              <input type="hidden" name="id" value={c.id} />
+                              <ConfirmDelete question={`Delete ${c.name}?`} />
+                            </form>
+                          ) : (
+                            <span className="text-xs text-stone-400" title="Move or delete its projects first">Has projects</span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
         )}

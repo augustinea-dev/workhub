@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createTask, deleteProject, saveProjectAsTemplate, updateProject } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
 import { Board, type BoardCard } from "@/components/board";
-import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
+import { ConfirmDelete, FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { ProjectNameFields } from "@/components/project-name-fields";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
 import { ASSIGNEES, assigneeLabel, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
@@ -49,6 +49,7 @@ export default async function ProjectPage({
   const company = companies.find((c) => c.id === p.company_id);
   const today = todayISO();
   const here = `/projects/${id}`;
+  const editing = isAdmin && sp(query.edit) === "1";
   const activePeople = people.filter((x) => x.active);
   const milestoneGroups = groupByMilestone(list, today);
   const next = milestoneGroups.find((g) => g.milestone.status !== "done");
@@ -402,8 +403,16 @@ export default async function ProjectPage({
         </section>
 
         <section className="card h-fit p-4">
-          <h2 className="mb-3 text-sm font-semibold">Project details</h2>
-          {isAdmin ? (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">{editing ? "Edit project" : "Project details"}</h2>
+            {isAdmin &&
+              (editing ? (
+                <Link href={here} className="text-xs font-medium text-stone-500 hover:text-stone-900">Cancel</Link>
+              ) : (
+                <Link href={`${here}?edit=1`} className="btn px-2.5 py-1 text-xs">Edit project</Link>
+              ))}
+          </div>
+          {editing ? (
             <>
               <form action={updateProject} className="space-y-3">
                 <input type="hidden" name="id" value={id} />
@@ -475,7 +484,10 @@ export default async function ProjectPage({
                   <label className="label" htmlFor="description">Description</label>
                   <textarea id="description" name="description" rows={4} defaultValue={p.description ?? ""} className="input w-full" />
                 </div>
-                <SubmitButton>Save project</SubmitButton>
+                <div className="flex items-center gap-2">
+                  <SubmitButton>Save project</SubmitButton>
+                  <Link href={here} className="btn">Cancel</Link>
+                </div>
               </form>
               <form action={saveProjectAsTemplate} className="mt-4 space-y-2 border-t border-stone-100 pt-3">
                 <input type="hidden" name="project_id" value={id} />
@@ -488,7 +500,9 @@ export default async function ProjectPage({
               </form>
               <form action={deleteProject} className="mt-4 border-t border-stone-100 pt-3">
                 <input type="hidden" name="id" value={id} />
-                <button className="btn-danger">Delete project and its tasks</button>
+                <ConfirmDelete question={`Delete this project and its ${list.length} task${list.length === 1 ? "" : "s"}? This can't be undone.`}>
+                  Delete project and its tasks
+                </ConfirmDelete>
               </form>
             </>
           ) : (
@@ -508,7 +522,7 @@ export default async function ProjectPage({
                 <div><dt className="label">Start</dt><dd>{formatDate(p.start_date)}</dd></div>
                 <div><dt className="label">Due</dt><dd>{formatDate(p.due_date)}</dd></div>
               </div>
-              <div><dt className="label">Description</dt><dd className="whitespace-pre-wrap text-stone-700">{p.description || "—"}</dd></div>
+              <div><dt className="label">Description</dt><dd className="whitespace-pre-wrap text-stone-700">{p.description || <span className="text-stone-500">No description</span>}</dd></div>
             </dl>
           )}
         </section>
