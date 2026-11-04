@@ -68,7 +68,7 @@ Every project name is built from its parts, the same way as in Workfront: **refe
   - Change the status of tasks assigned to you.
 - **Admins only:**
   - Change the status of any task.
-  - **Add a task:** title, assignee, start, due, milestone, and whether the task is itself a milestone.
+  - **Add a task:** title, assignees, start, due, milestone, and whether the task is itself a milestone.
   - Edit project details: name, status, owner, client, dates and description.
   - **Save as template:** copies the project's top-level tasks (subtasks are skipped), milestones, estimates and assignees into a new template.
   - Delete the project and its tasks.
@@ -83,18 +83,25 @@ Every project name is built from its parts, the same way as in Workfront: **refe
   - Move cards that are assigned to you: drag them, or use the status menu on the card (works on phones and keyboards). Other cards show "Assignee or Admin can move".
 - **Admins only:** move any card.
 
+## Assignees
+
+A task can have **several people**, like in Workfront.
+
+- **Everyone:** sees all of a task's assignees (lists and the board show "You, Jeremy" or "Cathy +2"). My Work shows every task you're one of the assignees on, and "Mine" filters do the same. **Any** assignee can change the task's status and tick its subtasks done.
+- **Admins only:** add or remove assignees with the people picker on any task form (type a name, pick from the list; × removes someone). Each person added gets a "You were assigned" notice. Templates have default assignees the same way, and new projects copy them (inactive people are left off).
+
 ## Task page
 
 **Where:** open any task.
 
 - **Everyone:**
   - Assigned to, due date in plain words ("tomorrow", "overdue by 2 days"), description, subtasks, and for a milestone the tasks in it.
-  - Side cards: Details (project, client, status, assignee, milestone), Dates, Hours (planned, logged, yours, remaining), History.
+  - Side cards: Details (project, client, status, assignees, milestone), Dates, Hours (planned, logged, yours, remaining), History.
   - Post updates and log time (see below).
-- **If the task is assigned to you:** a **Your status** bar with one-click To do, In progress, In review and Done.
+- **If you're one of the task's assignees:** a **Your status** bar with one-click To do, In progress, In review and Done.
 - **If it isn't:** a note saying who it's assigned to. You can still post updates and log time.
 - **Admins only:**
-  - Edit everything: title, status, start and due dates, assignee, milestone, estimate, description, and whether it's a milestone.
+  - Edit everything: title, status, start and due dates, assignees, milestone, estimate, description, and whether it's a milestone.
   - Delete the task.
   - Delete updates.
 
@@ -103,14 +110,14 @@ Every project name is built from its parts, the same way as in Workfront: **refe
 **Where:** the Subtasks section on a task page.
 
 - **Everyone:**
-  - A subtask is a full task under another task: its own page, status, assignee, dates, updates and time. One level deep for now.
+  - A subtask is a full task under another task: its own page, status, assignees, dates, updates and time. One level deep for now.
   - The parent shows "3 of 5 done" with a progress bar. Tick the box next to a subtask assigned to you to mark it done (tick again to undo).
   - A parent's **start, due and planned hours are calculated from its subtasks** (earliest start, latest due, total hours) whenever its subtasks have them.
-  - When every subtask is done, the parent's assignee sees "All subtasks are done. Mark this task done?" The parent isn't completed automatically.
+  - When every subtask is done, the parent's assignees see "All subtasks are done. Mark this task done?" The parent isn't completed automatically.
   - The parent's Hours card counts time logged on its subtasks too, with an "On subtasks" line.
   - In a project's list view, subtasks appear indented (↳) under their parent, and the parent shows "2/5 subtasks". On the board, each subtask is its own card labelled with its parent. On My Work, subtasks show their parent's name.
 - **Admins only:**
-  - **Add a subtask** (title, assignee, start, due, planned hours). Dates start as the parent's.
+  - **Add a subtask** (title, assignees, start, due, planned hours). Dates start as the parent's.
   - Edit or delete subtasks. Deleting a parent also deletes its subtasks, and the button says how many.
   - Calculated dates and hours on a parent can't be edited by hand; change the subtasks instead.
 - Milestones can't have subtasks or be subtasks. A subtask follows its parent's milestone.
@@ -165,7 +172,7 @@ Files open in Excel or Google Sheets.
 
 - **Everyone:**
   - **Projects:** the **Export CSV** button on the Projects page exports the list you're viewing (Open or All): client, owner, status, dates, next milestone, task counts, hours and billable hours.
-  - **A project's tasks:** the **Export CSV** button on a project page, next to List | Board: type, milestone, parent task, assignee, status, dates, estimate, hours logged and completed date.
+  - **A project's tasks:** the **Export CSV** button on a project page, next to List | Board: type, milestone, parent task, assignees, status, dates, estimate, hours logged and completed date.
   - **Your time:** **Export to CSV** at the bottom of the Time page. Pick a date range, up to a year. Each row has the date, client, project, task, hours, hour type, billable (yes/no), note and that week's timesheet status.
 - **Admins only:** in the time export, choose one person or **Everyone**.
 
@@ -173,13 +180,13 @@ Files open in Excel or Google Sheets.
 
 **Where:** Inbox in the sidebar (the badge shows unread).
 
-- **Everyone:** notices for tasks assigned to you, new updates on tasks you're involved in (assignee, project owner, or you've posted), mentions, and timesheet decisions. Opening one marks it read and takes you to the task or week. **Mark all read** clears the badge.
+- **Everyone:** notices for tasks assigned to you, new updates on tasks you're involved in (an assignee, the project owner, or you've posted), mentions, and timesheet decisions. Opening one marks it read and takes you to the task or week. **Mark all read** clears the badge.
 
 ## Templates (Admins only)
 
 **Where:** Templates in the sidebar.
 
-- Create a template, then add its tasks: title, start day and due day (working days from the project start, Monday to Friday; day 0 is the start), hours, type (Task, Milestone, or part of a milestone), default assignee and description.
+- Create a template, then add its tasks: title, start day and due day (working days from the project start, Monday to Friday; day 0 is the start), hours, type (Task, Milestone, or part of a milestone), default assignees and description.
 - **Preview dates for a start on** shows the real dates for any start date.
 - Use a template from **+ New project** on the Projects page. Default assignees who are inactive are left Unassigned.
 - Changing or deleting a template doesn't affect projects already created from it.

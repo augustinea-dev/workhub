@@ -47,7 +47,7 @@ export type Task = {
   project_id: string;
   title: string;
   description: string | null;
-  assignee_id: string | null;
+  assignee_ids: string[];
   status: TaskStatus;
   is_milestone: boolean;
   parent_task_id: string | null;
@@ -135,7 +135,7 @@ export type TemplateTask = {
   estimate_hours: number | null;
   is_milestone: boolean;
   milestone_id: string | null;
-  assignee_id: string | null;
+  assignee_ids: string[];
   sort_order: number;
   version: number;
 };

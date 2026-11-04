@@ -148,12 +148,16 @@ export function hasTaskFilters(f: TaskFilters): boolean {
   return !!f.assignee || !!f.status || f.overdue;
 }
 
-type TaskLike = { status: TaskStatus; due_date: string | null; assignee_id: string | null };
+type TaskLike = { status: TaskStatus; due_date: string | null; assignee_ids: string[] };
 
 export function taskMatches(t: TaskLike, f: TaskFilters, meId: string, today: string): boolean {
   return (
     (!f.assignee ||
-      (f.assignee === "me" ? t.assignee_id === meId : f.assignee === "none" ? !t.assignee_id : t.assignee_id === f.assignee)) &&
+      (f.assignee === "me"
+        ? t.assignee_ids.includes(meId)
+        : f.assignee === "none"
+          ? t.assignee_ids.length === 0
+          : t.assignee_ids.includes(f.assignee))) &&
     (!f.status || t.status === f.status) &&
     (!f.overdue || (!!t.due_date && t.due_date < today && t.status !== "done"))
   );
@@ -163,12 +167,16 @@ const STATUS_ORDER = Object.fromEntries(TASK_STATUSES.map((s, i) => [s.value, St
 
 /** Open tasks first, then by the chosen column. */
 export function compareTasks(f: TaskFilters, people: Profile[]) {
-  const name = (id: string | null) => (id ? people.find((p) => p.id === id)?.full_name ?? "" : "");
+  const name = (ids: string[]) =>
+    ids
+      .map((id) => people.find((p) => p.id === id)?.full_name ?? "")
+      .sort((a, b) => a.localeCompare(b))
+      .join(", ");
   return (a: TaskLike, b: TaskLike): number => {
     const done = Number(a.status === "done") - Number(b.status === "done");
     if (done && f.sort !== "status") return done;
     if (f.sort === "status") return compareText(STATUS_ORDER[a.status], STATUS_ORDER[b.status], f.dir);
-    if (f.sort === "assignee") return compareText(name(a.assignee_id), name(b.assignee_id), f.dir) || compareText(a.due_date, b.due_date, "asc");
+    if (f.sort === "assignee") return compareText(name(a.assignee_ids), name(b.assignee_ids), f.dir) || compareText(a.due_date, b.due_date, "asc");
     return compareText(a.due_date, b.due_date, f.dir);
   };
 }

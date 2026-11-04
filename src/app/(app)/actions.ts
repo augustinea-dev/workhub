@@ -89,6 +89,35 @@ export async function deleteCompany(fd: FormData) {
   done("/clients", `Deleted ${data[0].name}.`);
 }
 
+// ---------- assignees ----------
+function assigneeIdsFrom(fd: FormData): string[] {
+  return [...new Set(fd.getAll("assignee_ids").map(String).filter(Boolean))];
+}
+
+/** Make a task's (or template task's) assignees exactly `ids`. */
+async function syncAssignees(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: "task_assignees" | "template_task_assignees",
+  key: "task_id" | "template_task_id",
+  id: string,
+  ids: string[],
+): Promise<string | null> {
+  const { data: current, error } = await supabase.from(table).select("profile_id").eq(key, id);
+  if (error) return error.message;
+  const now = (current ?? []).map((r) => r.profile_id as string);
+  const gone = now.filter((x) => !ids.includes(x));
+  const added = ids.filter((x) => !now.includes(x));
+  if (gone.length) {
+    const { error: e } = await supabase.from(table).delete().eq(key, id).in("profile_id", gone);
+    if (e) return e.message;
+  }
+  if (added.length) {
+    const { error: e } = await supabase.from(table).insert(added.map((profile_id) => ({ [key]: id, profile_id })));
+    if (e) return e.message;
+  }
+  return null;
+}
+
 // ---------- settings (admin) ----------
 export async function updateNextReference(fd: FormData) {
   await requireAdmin();
@@ -247,18 +276,23 @@ export async function createTask(fd: FormData) {
   const parentId = opt(fd, "parent_task_id");
   const isMilestone = !parentId && str(fd, "is_milestone") === "on";
   const supabase = await createClient();
-  const { error } = await supabase.from("tasks").insert({
-    project_id: projectId,
-    parent_task_id: parentId,
-    title,
-    assignee_id: opt(fd, "assignee_id"),
-    start_date: startDate,
-    due_date: dueDate,
-    estimate_hours: Number.parseFloat(str(fd, "estimate_hours")) >= 0 ? Number.parseFloat(str(fd, "estimate_hours")) : null,
-    is_milestone: isMilestone,
-    milestone_id: isMilestone || parentId ? null : opt(fd, "milestone_id"),
-  });
-  if (error) fail(back, error.message);
+  const { data: created, error } = await supabase
+    .from("tasks")
+    .insert({
+      project_id: projectId,
+      parent_task_id: parentId,
+      title,
+      start_date: startDate,
+      due_date: dueDate,
+      estimate_hours: Number.parseFloat(str(fd, "estimate_hours")) >= 0 ? Number.parseFloat(str(fd, "estimate_hours")) : null,
+      is_milestone: isMilestone,
+      milestone_id: isMilestone || parentId ? null : opt(fd, "milestone_id"),
+    })
+    .select("id")
+    .single();
+  if (error || !created) fail(back, error?.message ?? "Couldn't add the task.");
+  const assignError = await syncAssignees(supabase, "task_assignees", "task_id", created.id, assigneeIdsFrom(fd));
+  if (assignError) fail(back, `Added “${title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Added “${title}”.`);
 }
 
@@ -280,7 +314,6 @@ export async function updateTask(fd: FormData) {
       title,
       description: opt(fd, "description"),
       status: oneOf(str(fd, "status"), TASK_STATUSES, "todo"),
-      assignee_id: opt(fd, "assignee_id"),
       start_date: startDate,
       due_date: dueDate,
       estimate_hours: Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
@@ -292,12 +325,14 @@ export async function updateTask(fd: FormData) {
     .select("id");
   if (error) fail(path, error.message);
   if (!data?.length) fail(path, CONFLICT);
+  const assignError = await syncAssignees(supabase, "task_assignees", "task_id", id, assigneeIdsFrom(fd));
+  if (assignError) fail(path, `Task saved, but its assignees couldn't be saved: ${assignError}`);
   done(path, "Task saved.");
 }
 
 /**
  * Quick status change from a list; same version check as the full edit.
- * Admins can change any task; members only tasks assigned to them (enforced by RLS).
+ * Admins can change any task; members only tasks they're assigned to (enforced by RLS).
  */
 export async function setTaskStatus(fd: FormData) {
   await requireProfile();
@@ -363,7 +398,6 @@ function templateTaskFields(fd: FormData, back: string) {
     estimate_hours: Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
     is_milestone: kind === "milestone",
     milestone_id: kind.startsWith("in:") ? kind.slice(3) : null,
-    assignee_id: opt(fd, "assignee_id"),
   };
 }
 
@@ -413,8 +447,14 @@ export async function createTemplateTask(fd: FormData) {
   const back = `/templates/${templateId}`;
   const fields = templateTaskFields(fd, back);
   const supabase = await createClient();
-  const { error } = await supabase.from("template_tasks").insert({ template_id: templateId, ...fields });
-  if (error) fail(back, error.message);
+  const { data: created, error } = await supabase
+    .from("template_tasks")
+    .insert({ template_id: templateId, ...fields })
+    .select("id")
+    .single();
+  if (error || !created) fail(back, error?.message ?? "Couldn't add the task.");
+  const assignError = await syncAssignees(supabase, "template_task_assignees", "template_task_id", created.id, assigneeIdsFrom(fd));
+  if (assignError) fail(back, `Added “${fields.title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Added “${fields.title}”.`);
 }
 
@@ -431,6 +471,8 @@ export async function updateTemplateTask(fd: FormData) {
     .select("id");
   if (error) fail(back, error.message);
   if (!data?.length) fail(back, CONFLICT);
+  const assignError = await syncAssignees(supabase, "template_task_assignees", "template_task_id", str(fd, "id"), assigneeIdsFrom(fd));
+  if (assignError) fail(back, `Saved “${fields.title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Saved “${fields.title}”.`);
 }
 

@@ -32,8 +32,10 @@ export default async function MyWorkPage({
   const [{ data: tasks }, { data: hours }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, status, due_date, version, is_milestone, project:projects(id, name, company:companies(id, name)), parent:parent_task_id(id, title)")
-      .eq("assignee_id", me.id)
+      .select(
+        "id, title, status, due_date, version, is_milestone, project:projects(id, name, company:companies(id, name)), parent:parent_task_id(id, title), task_assignees!inner(profile_id)",
+      )
+      .eq("task_assignees.profile_id", me.id)
       .neq("status", "done")
       .order("due_date", { ascending: true, nullsFirst: false }),
     supabase
@@ -69,7 +71,7 @@ export default async function MyWorkPage({
 
   return (
     <>
-      <LiveRefresh subs={[{ table: "tasks", filter: `assignee_id=eq.${me.id}` }]} />
+      <LiveRefresh subs={[{ table: "tasks" }, { table: "task_assignees", filter: `profile_id=eq.${me.id}` }]} />
       <PageHeader title={`Hi, ${me.full_name.split(" ")[0]}`} subtitle={filtered ? `${rows.length} of ${mine.length} open tasks assigned to you` : `${mine.length} open tasks assigned to you`}>
         <Link href="/time" className="card px-4 py-3 text-right hover:bg-stone-50">
           <span className="block text-xs uppercase tracking-wide text-stone-500">Logged this week</span>

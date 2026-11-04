@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteComment, deleteTask, logTime, setTaskStatus, updateTask } from "../../actions";
+import { AssigneePicker } from "@/components/assignee-picker";
 import { LiveRefresh, SubmitButton } from "@/components/client";
 import { MentionComposer } from "@/components/mention-composer";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, HealthBadge, TaskBadge } from "@/components/ui";
+import { assigneeLabel, pickerOptions, withAssignees } from "@/lib/assignees";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
-import { getPeople, nameOf, personOption, sp } from "@/lib/data";
+import { getPeople, nameOf, sp } from "@/lib/data";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { HOUR_TYPES, TASK_STATUSES, type Comment, type Profile, type Task, type TaskStatus, type TimeEntry } from "@/lib/types";
 
-type Subtask = { id: string; title: string; status: TaskStatus; assignee_id: string | null; due_date: string | null };
+type Subtask = { id: string; title: string; status: TaskStatus; assignee_ids: string[]; due_date: string | null };
+type Raw<T> = Omit<T, "assignee_ids"> & { task_assignees: { profile_id: string }[] };
 type Child = Subtask & { version: number; start_date: string | null; estimate_hours: number | null };
 type ProjectTask = Subtask & { is_milestone: boolean; milestone_id: string | null };
 
@@ -27,7 +30,7 @@ function TaskList({ items, people, meId }: { items: Subtask[]; people: Profile[]
               {s.title}
             </Link>
             <p className="text-xs text-stone-500">
-              {s.assignee_id === meId ? "You" : nameOf(people, s.assignee_id)}
+              {assigneeLabel(s.assignee_ids, people, meId)}
               {s.due_date && ` · Due ${formatDate(s.due_date)}`}
             </p>
           </div>
@@ -94,7 +97,7 @@ export default async function TaskPage({
     supabase
       .from("tasks")
       .select(
-        "*, project:projects(id, name, company:companies(name), tasks(id, title, status, due_date, assignee_id, is_milestone, milestone_id)), parent:parent_task_id(id, title)",
+        "*, task_assignees(profile_id), project:projects(id, name, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id))), parent:parent_task_id(id, title)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -102,7 +105,7 @@ export default async function TaskPage({
     supabase.from("time_entries").select("*").eq("task_id", id).order("work_date", { ascending: false }),
     supabase
       .from("tasks")
-      .select("id, title, status, assignee_id, due_date, start_date, estimate_hours, version")
+      .select("id, title, status, due_date, start_date, estimate_hours, version, task_assignees(profile_id)")
       .eq("parent_task_id", id)
       .order("sort_order"),
     getPeople(),
@@ -116,12 +119,16 @@ export default async function TaskPage({
   ]);
   if (!task) notFound();
 
-  const t = task as Task & {
+  const raw = task as Raw<Task> & {
+    project: { id: string; name: string; company: { name: string } | null; tasks: Raw<ProjectTask>[] };
+    parent: { id: string; title: string } | null;
+  };
+  const t = { ...withAssignees(raw), project: { ...raw.project, tasks: raw.project.tasks.map(withAssignees) as ProjectTask[] } } as Task & {
     project: { id: string; name: string; company: { name: string } | null; tasks: ProjectTask[] };
     parent: { id: string; title: string } | null;
   };
   const parent = t.parent;
-  const subtasks = (children ?? []) as Child[];
+  const subtasks = ((children ?? []) as Raw<Child>[]).map(withAssignees) as Child[];
   const { data: childTime } = subtasks.length
     ? await supabase.from("time_entries").select("hours").in("task_id", subtasks.map((s) => s.id))
     : { data: [] as { hours: number }[] };
@@ -141,11 +148,11 @@ export default async function TaskPage({
   const estimate = t.estimate_hours != null ? Number(t.estimate_hours) : null;
   const here = `/tasks/${id}`;
   const today = todayISO();
-  const isAssignee = t.assignee_id === me.id;
+  const isAssignee = t.assignee_ids.includes(me.id);
   const isDone = t.status === "done";
   const dueIn = t.due_date ? daysBetween(today, t.due_date) : null;
   const overdue = !isDone && dueIn != null && dueIn < 0;
-  const assigneeName = isAssignee ? "You" : nameOf(people, t.assignee_id);
+  const assigneeName = assigneeLabel(t.assignee_ids, people, me.id);
   const milestones = groupByMilestone(t.project.tasks, today);
   const inMilestone = t.milestone_id ? milestones.find((g) => g.milestone.id === t.milestone_id) : undefined;
   const ownGroup = t.is_milestone ? milestones.find((g) => g.milestone.id === t.id) : undefined;
@@ -174,6 +181,7 @@ export default async function TaskPage({
           { table: "tasks", filter: `parent_task_id=eq.${id}` },
           { table: "comments", filter: `task_id=eq.${id}` },
           { table: "time_entries", filter: `task_id=eq.${id}` },
+          { table: "task_assignees", filter: `task_id=eq.${id}` },
         ]}
       />
       <p className="mb-2 text-sm text-stone-500">
@@ -196,7 +204,7 @@ export default async function TaskPage({
         <TaskBadge status={t.status} />
       </div>
       <p className="mb-6 text-sm text-stone-600">
-        {t.assignee_id ? <>Assigned to <span className="font-medium text-stone-900">{assigneeName}</span></> : "Unassigned"}
+        {t.assignee_ids.length ? <>Assigned to <span className="font-medium text-stone-900">{assigneeName}</span></> : "Unassigned"}
         {" · "}
         {t.due_date ? <>Due {dueText}</> : dueText}
       </p>
@@ -235,8 +243,8 @@ export default async function TaskPage({
 
       {!isAdmin && !canChangeStatus(me, t) && (
         <p className="mb-6 rounded-md border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
-          {t.assignee_id
-            ? `This task is assigned to ${assigneeName}. You can post updates and log time; ${assigneeName} or an admin can change its status.`
+          {t.assignee_ids.length
+            ? `This task is assigned to ${assigneeName}. You can post updates and log time; ${t.assignee_ids.length > 1 ? "its assignees" : assigneeName} or an admin can change its status.`
             : "This task isn't assigned to anyone yet. You can post updates and log time; ask an admin to assign it."}
         </p>
       )}
@@ -353,7 +361,7 @@ export default async function TaskPage({
                             {s.title}
                           </Link>
                           <p className="text-xs text-stone-500">
-                            {s.assignee_id === me.id ? "You" : nameOf(people, s.assignee_id)}
+                            {assigneeLabel(s.assignee_ids, people, me.id)}
                             {s.due_date && (
                               <span className={late ? "font-medium text-red-700" : undefined}> · Due {formatDate(s.due_date)}</span>
                             )}
@@ -374,12 +382,9 @@ export default async function TaskPage({
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Add a subtask</p>
                   <div className="flex flex-wrap items-end gap-2">
                     <input name="title" required placeholder="Subtask title" aria-label="Subtask title" className="input min-w-48 flex-1" />
-                    <select name="assignee_id" defaultValue={t.assignee_id ?? ""} aria-label="Assignee" className="input w-48">
-                      <option value="">Unassigned</option>
-                      {people.filter((x) => x.active).map((x) => (
-                        <option key={x.id} value={x.id}>{personOption(x)}</option>
-                      ))}
-                    </select>
+                    <div className="w-72">
+                      <AssigneePicker {...pickerOptions(people)} defaultValue={t.assignee_ids} />
+                    </div>
                     <input name="start_date" type="date" defaultValue={t.start_date ?? ""} aria-label="Start date" className="input w-40" />
                     <input name="due_date" type="date" defaultValue={t.due_date ?? ""} aria-label="Due date" className="input w-40" />
                     <input name="estimate_hours" type="number" step="0.25" min="0" placeholder="Hours" aria-label="Planned hours" className="input w-24" />
@@ -495,13 +500,7 @@ export default async function TaskPage({
                   </div>
                 </div>
                 <div>
-                  <label className="label" htmlFor="assignee_id">Assignee</label>
-                  <select id="assignee_id" name="assignee_id" defaultValue={t.assignee_id ?? ""} className="input w-full">
-                    <option value="">Unassigned</option>
-                    {people.filter((x) => x.active).map((x) => (
-                      <option key={x.id} value={x.id}>{personOption(x)}</option>
-                    ))}
-                  </select>
+                  <AssigneePicker key={t.version} {...pickerOptions(people, t.assignee_ids)} defaultValue={t.assignee_ids} />
                 </div>
                 {(rolled.start || rolled.due) && (
                   <p className="-mt-1 text-xs text-stone-500">Calculated from subtasks.</p>
@@ -552,7 +551,7 @@ export default async function TaskPage({
                 </Field>
                 <Field label="Client">{t.project.company?.name ?? "No client"}</Field>
                 <Field label="Status"><TaskBadge status={t.status} /></Field>
-                <Field label="Assignee">{t.assignee_id ? assigneeName : "Unassigned"}</Field>
+                <Field label={t.assignee_ids.length > 1 ? "Assignees" : "Assignee"}>{assigneeName}</Field>
                 {inMilestone && (
                   <Field label="Milestone" wide>
                     <span className="flex flex-wrap items-center gap-2">
@@ -617,7 +616,7 @@ export default async function TaskPage({
 
           {!isAdmin && (
             <p className="text-xs text-stone-500">
-              {isAssignee ? "You can update the status. " : ""}Need a change to dates, hours or the assignee? Ask an admin or post an update.
+              {isAssignee ? "You can update the status. " : ""}Need a change to dates, hours or assignees? Ask an admin or post an update.
             </p>
           )}
         </div>

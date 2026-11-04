@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteProject, saveProjectAsTemplate, updateProject } from "../../actions";
+import { AssigneePicker } from "@/components/assignee-picker";
 import { Board, type BoardCard } from "@/components/board";
 import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { ProjectNameFields } from "@/components/project-name-fields";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
+import { ASSIGNEES, assigneeLabel, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
 import { groupByMilestone } from "@/lib/milestones";
@@ -29,7 +31,7 @@ export default async function ProjectPage({
 
   const [{ data: project }, { data: tasks }, { data: time }, people, companies] = await Promise.all([
     supabase.from("projects").select("*").eq("id", id).maybeSingle(),
-    supabase.from("tasks").select("*").eq("project_id", id).order("sort_order"),
+    supabase.from("tasks").select(`*, ${ASSIGNEES}`).eq("project_id", id).order("sort_order"),
     supabase.from("time_entries").select("task_id, hours, hour_type").eq("project_id", id),
     getPeople(),
     getCompanies(),
@@ -38,7 +40,9 @@ export default async function ProjectPage({
   if (!project) notFound();
 
   const p = project as Project;
-  const list = (tasks ?? []) as Task[];
+  const list = ((tasks ?? []) as (Omit<Task, "assignee_ids"> & { task_assignees: { profile_id: string }[] })[]).map(
+    withAssignees,
+  ) as Task[];
   const open = list.filter((t) => t.status !== "done");
   const totalHours = (time ?? []).reduce((s, t) => s + Number(t.hours), 0);
   const billable = (time ?? []).filter((t) => t.hour_type === "billable").reduce((s, t) => s + Number(t.hours), 0);
@@ -100,7 +104,7 @@ export default async function ProjectPage({
   const byDue = (a: Task, b: Task) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999") || a.sort_order - b.sort_order;
   const byFinished = (a: Task, b: Task) => (b.completed_at ?? "").localeCompare(a.completed_at ?? "");
   const boardCards: BoardCard[] = list
-    .filter((t) => who === "all" || t.assignee_id === me.id)
+    .filter((t) => who === "all" || t.assignee_ids.includes(me.id))
     .filter((t) =>
       !msFilter ? true : msFilter === "none" ? !t.is_milestone && !milestoneOf(t) : milestoneOf(t) === msFilter || t.id === msFilter,
     )
@@ -116,8 +120,8 @@ export default async function ProjectPage({
         isMilestone: t.is_milestone,
         milestone: milestoneOf(t) ? milestoneTitle.get(milestoneOf(t)!) ?? null : null,
         parent: t.parent_task_id ? byId.get(t.parent_task_id)?.title ?? null : null,
-        assignee: t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id),
-        isMine: t.assignee_id === me.id,
+        assignee: shortAssigneeLabel(t.assignee_ids, people, me.id),
+        isMine: t.assignee_ids.includes(me.id),
         due: t.due_date ? formatDate(t.due_date) : null,
         late: !!t.due_date && t.due_date < today && t.status !== "done",
         hours: est != null ? `${+logged.toFixed(2)} / ${+est.toFixed(2)} h` : logged ? `${+logged.toFixed(2)} h` : null,
@@ -148,8 +152,8 @@ export default async function ProjectPage({
             </span>
           )}
         </td>
-        <td className={`table-cell ${t.assignee_id === me.id ? "font-medium" : "text-stone-600"}`}>
-          {t.assignee_id === me.id ? "You" : nameOf(people, t.assignee_id)}
+        <td className={`table-cell ${t.assignee_ids.includes(me.id) ? "font-medium" : "text-stone-600"}`}>
+          {assigneeLabel(t.assignee_ids, people, me.id)}
         </td>
         <td className={`table-cell whitespace-nowrap ${late ? "font-medium text-red-700" : "text-stone-600"}`}>
           {formatDate(t.due_date)}
@@ -167,7 +171,7 @@ export default async function ProjectPage({
 
   return (
     <>
-      <LiveRefresh subs={[{ table: "tasks", filter: `project_id=eq.${id}` }]} />
+      <LiveRefresh subs={[{ table: "tasks", filter: `project_id=eq.${id}` }, { table: "task_assignees" }]} />
       <p className="mb-2 text-sm text-stone-500">
         <Link href="/projects" className="hover:underline">Projects</Link>
         {company && <> · {company.name}</>}
@@ -256,7 +260,7 @@ export default async function ProjectPage({
                     <option value="me">Mine</option>
                     <option value="none">Unassigned</option>
                     {people
-                      .filter((x) => x.id !== me.id && list.some((t) => t.assignee_id === x.id))
+                      .filter((x) => x.id !== me.id && list.some((t) => t.assignee_ids.includes(x.id)))
                       .map((x) => (
                         <option key={x.id} value={x.id}>{x.full_name}</option>
                       ))}
@@ -362,13 +366,7 @@ export default async function ProjectPage({
                   <input id="new_task_title" name="title" required placeholder="Task title" className="input w-full" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="label" htmlFor="new_task_assignee">Assignee</label>
-                  <select id="new_task_assignee" name="assignee_id" className="input w-full" defaultValue="">
-                    <option value="">Unassigned</option>
-                    {activePeople.map((x) => (
-                      <option key={x.id} value={x.id}>{personOption(x)}</option>
-                    ))}
-                  </select>
+                  <AssigneePicker {...pickerOptions(people)} />
                 </div>
                 <div>
                   <label className="label" htmlFor="new_task_start">Start</label>

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTemplateTask, deleteTemplate, deleteTemplateTask, updateTemplate, updateTemplateTask } from "../../actions";
+import { AssigneePicker } from "@/components/assignee-picker";
 import { SubmitButton } from "@/components/client";
 import { Empty, Flash } from "@/components/ui";
 import { addWorkingDays, formatDay, isValidISODate, todayISO } from "@/lib/dates";
-import { getPeople, personOption, sp } from "@/lib/data";
+import { pickerOptions } from "@/lib/assignees";
+import { getPeople, sp } from "@/lib/data";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ProjectTemplate, TemplateTask } from "@/lib/types";
@@ -19,7 +21,6 @@ function TaskFields({
   people: Profile[];
 }) {
   const kind = task?.is_milestone ? "milestone" : task?.milestone_id ? `in:${task.milestone_id}` : "";
-  const assignee = task?.assignee_id ? people.find((p) => p.id === task.assignee_id) : undefined;
   const suffix = task?.id ?? "new";
   return (
     <>
@@ -55,17 +56,13 @@ function TaskFields({
           )}
         </select>
       </div>
-      <div>
-        <label className="label" htmlFor={`who-${suffix}`}>Default assignee</label>
-        <select id={`who-${suffix}`} name="assignee_id" defaultValue={task?.assignee_id ?? ""} className="input w-full">
-          <option value="">Unassigned</option>
-          {assignee && !assignee.active && (
-            <option value={assignee.id}>{assignee.full_name} (inactive, will be Unassigned)</option>
-          )}
-          {people.filter((p) => p.active).map((p) => (
-            <option key={p.id} value={p.id}>{personOption(p)}</option>
-          ))}
-        </select>
+      <div className="md:col-span-2 xl:col-span-1">
+        <AssigneePicker
+          key={task?.version ?? "new"}
+          {...pickerOptions(people, task?.assignee_ids)}
+          defaultValue={task?.assignee_ids ?? []}
+          label="Default assignees"
+        />
       </div>
       <details className="md:col-span-full" open={!!task?.description}>
         <summary className="cursor-pointer text-xs font-medium text-stone-500">Description</summary>
@@ -88,13 +85,17 @@ export default async function TemplatePage({
   const supabase = await createClient();
   const [{ data: template }, { data: taskData }, people] = await Promise.all([
     supabase.from("project_templates").select("*").eq("id", id).maybeSingle(),
-    supabase.from("template_tasks").select("*").eq("template_id", id),
+    supabase.from("template_tasks").select("*, template_task_assignees(profile_id)").eq("template_id", id),
     getPeople(),
   ]);
   if (!template) notFound();
 
   const t = template as ProjectTemplate;
-  const tasks = ((taskData ?? []) as TemplateTask[]).sort(
+  const tasks = (
+    (taskData ?? []) as (Omit<TemplateTask, "assignee_ids"> & { template_task_assignees: { profile_id: string }[] })[]
+  )
+    .map(({ template_task_assignees, ...rest }) => ({ ...rest, assignee_ids: template_task_assignees.map((a) => a.profile_id) }))
+    .sort(
     (a, b) => a.start_day - b.start_day || a.due_day - b.due_day || a.sort_order - b.sort_order,
   );
   const milestones = tasks.filter((x) => x.is_milestone);
