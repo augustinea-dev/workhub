@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createTask, deleteComment, deleteTask, logTime, setTaskStatus, updateTask } from "../../actions";
+import { assignRoleSlot, createTask, deleteComment, deleteTask, logTime, setTaskStatus, takeRoleTask, updateTask } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
+import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { ConfirmDelete, LiveRefresh, SubmitButton } from "@/components/client";
 import { MentionComposer } from "@/components/mention-composer";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, HealthBadge, TaskBadge } from "@/components/ui";
-import { assigneeLabel, pickerOptions, withAssignees } from "@/lib/assignees";
+import { assigneeLabel, openRoleNames, pickerOptions, roleIdsOf, withAssignees } from "@/lib/assignees";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
-import { getPeople, nameOf, sp } from "@/lib/data";
+import { getJobRoles, getPeople, nameOf, sp } from "@/lib/data";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
 import { requireProfile } from "@/lib/session";
@@ -16,7 +17,10 @@ import { createClient } from "@/lib/supabase/server";
 import { HOUR_TYPES, TASK_STATUSES, type Comment, type Profile, type Task, type TaskStatus, type TimeEntry } from "@/lib/types";
 
 type Subtask = { id: string; title: string; status: TaskStatus; assignee_ids: string[]; due_date: string | null };
-type Raw<T> = Omit<T, "assignee_ids"> & { task_assignees: { profile_id: string }[] };
+type Raw<T> = Omit<T, "assignee_ids" | "open_roles"> & {
+  task_assignees: { profile_id: string; as_role_id?: string | null }[];
+  task_role_slots?: { id: string; role_id: string }[];
+};
 type Child = Subtask & { version: number; start_date: string | null; estimate_hours: number | null };
 type ProjectTask = Subtask & { is_milestone: boolean; milestone_id: string | null };
 
@@ -96,11 +100,11 @@ export default async function TaskPage({
   const isAdmin = me.role === "admin";
   const supabase = await createClient();
 
-  const [{ data: task }, { data: comments }, { data: time }, { data: children }, people] = await Promise.all([
+  const [{ data: task }, { data: comments }, { data: time }, { data: children }, people, jobRoles] = await Promise.all([
     supabase
       .from("tasks")
       .select(
-        "*, task_assignees(profile_id), project:projects(id, name, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id))), parent:parent_task_id(id, title)",
+        "*, task_assignees(profile_id, as_role_id), task_role_slots(id, role_id), project:projects(id, name, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id), task_role_slots(id, role_id))), parent:parent_task_id(id, title)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -108,10 +112,11 @@ export default async function TaskPage({
     supabase.from("time_entries").select("*").eq("task_id", id).order("work_date", { ascending: false }),
     supabase
       .from("tasks")
-      .select("id, title, status, due_date, start_date, estimate_hours, version, task_assignees(profile_id)")
+      .select("id, title, status, due_date, start_date, estimate_hours, version, task_assignees(profile_id), task_role_slots(id, role_id)")
       .eq("parent_task_id", id)
       .order("sort_order"),
     getPeople(),
+    getJobRoles(),
     // Opening a task counts as reading its notifications.
     supabase
       .from("notification_events")
@@ -156,7 +161,10 @@ export default async function TaskPage({
   const isDone = t.status === "done";
   const dueIn = t.due_date ? daysBetween(today, t.due_date) : null;
   const overdue = !isDone && dueIn != null && dueIn < 0;
-  const assigneeName = assigneeLabel(t.assignee_ids, people, me.id);
+  const asRole = new Map(raw.task_assignees.map((a) => [a.profile_id, a.as_role_id ?? null]));
+  const roleName = (id: string | null | undefined) => jobRoles.find((r) => r.id === id)?.name;
+  const assigneeName = assigneeLabel(t.assignee_ids, people, me.id, openRoleNames(t.open_roles, jobRoles));
+  const myRoleIds = roleIdsOf(people.find((p) => p.id === me.id));
   const milestones = groupByMilestone(t.project.tasks, today);
   const inMilestone = t.milestone_id ? milestones.find((g) => g.milestone.id === t.milestone_id) : undefined;
   const ownGroup = t.is_milestone ? milestones.find((g) => g.milestone.id === t.id) : undefined;
@@ -222,6 +230,7 @@ export default async function TaskPage({
           { table: "comments", filter: `task_id=eq.${id}` },
           { table: "time_entries", filter: `task_id=eq.${id}` },
           { table: "task_assignees", filter: `task_id=eq.${id}` },
+          { table: "task_role_slots", filter: `task_id=eq.${id}` },
         ]}
       />
       <p className="mb-2 text-sm text-stone-500">
@@ -524,6 +533,9 @@ export default async function TaskPage({
                 </div>
                 <div>
                   <AssigneePicker key={t.version} {...pickerOptions(people, t.assignee_ids)} defaultValue={t.assignee_ids} />
+                  <div className="mt-3">
+                    <RoleSlotsPicker key={t.version} roles={jobRoles} defaultValue={t.open_roles.map((s) => s.role_id)} />
+                  </div>
                 </div>
                 {(rolled.start || rolled.due) && (
                   <p className="-mt-1 text-xs text-stone-500">Calculated from subtasks.</p>
@@ -592,7 +604,63 @@ export default async function TaskPage({
                 </Field>
                 <Field label="Client">{t.project.company?.name ?? "No client"}</Field>
                 <Field label="Status"><TaskBadge status={t.status} /></Field>
-                <Field label={t.assignee_ids.length > 1 ? "Assignees" : "Assignee"}>{assigneeName}</Field>
+                <Field label={t.assignee_ids.length > 1 ? "Assignees" : "Assignee"} wide>
+                  {t.assignee_ids.length ? (
+                    <ul className="space-y-0.5">
+                      {t.assignee_ids.map((pid) => (
+                        <li key={pid}>
+                          {pid === me.id ? "You" : nameOf(people, pid)}
+                          {roleName(asRole.get(pid)) && <span className="text-stone-500"> as {roleName(asRole.get(pid))}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-stone-500">No one yet</span>
+                  )}
+                </Field>
+                {t.open_roles.length > 0 && (
+                  <Field label="Open roles" wide>
+                    <ul className="space-y-2">
+                      {t.open_roles.map((slot) => {
+                        const holders = people.filter((p) => p.active && p.job_roles?.some((r) => r.role_id === slot.role_id));
+                        return (
+                          <li key={slot.id} className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">{roleName(slot.role_id) ?? "Role"}</span>
+                            {!isDone && myRoleIds.includes(slot.role_id) && !isAssignee && (
+                              <form action={takeRoleTask}>
+                                <input type="hidden" name="slot_id" value={slot.id} />
+                                <input type="hidden" name="redirect_to" value={here} />
+                                <SubmitButton className="btn px-2.5 py-1 text-xs" pendingText="Taking…">Take it</SubmitButton>
+                              </form>
+                            )}
+                            {isAdmin && (
+                              <form action={assignRoleSlot} className="flex items-center gap-1">
+                                <input type="hidden" name="slot_id" value={slot.id} />
+                                <input type="hidden" name="redirect_to" value={here} />
+                                <select name="profile_id" defaultValue="" aria-label={`Fill ${roleName(slot.role_id)}`} className="input w-36 py-1 text-xs">
+                                  <option value="" disabled>Fill with…</option>
+                                  {holders.length > 0 && (
+                                    <optgroup label="Has this role">
+                                      {holders.map((p) => (
+                                        <option key={p.id} value={p.id}>{p.full_name}</option>
+                                      ))}
+                                    </optgroup>
+                                  )}
+                                  <optgroup label="Everyone else">
+                                    {people.filter((p) => p.active && !holders.includes(p)).map((p) => (
+                                      <option key={p.id} value={p.id}>{p.full_name}</option>
+                                    ))}
+                                  </optgroup>
+                                </select>
+                                <SubmitButton className="btn px-2 py-1 text-xs" pendingText="…">Fill</SubmitButton>
+                              </form>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Field>
+                )}
                 {inMilestone && (
                   <Field label="Milestone" wide>
                     <span className="flex flex-wrap items-center gap-2">

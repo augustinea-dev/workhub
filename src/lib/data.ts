@@ -1,12 +1,12 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { Company, Profile, ProjectType } from "@/lib/types";
+import type { Company, JobRole, Profile, ProjectType } from "@/lib/types";
 
 export const getPeople = cache(async (): Promise<Profile[]> => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, job_role, active, weekly_hours")
+    .select("id, email, full_name, role, active, weekly_hours, job_roles:profile_job_roles(role_id, is_main)")
     .order("full_name");
   return (data ?? []) as Profile[];
 });
@@ -15,6 +15,12 @@ export const getCompanies = cache(async (): Promise<Company[]> => {
   const supabase = await createClient();
   const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month").order("name");
   return (data ?? []) as Company[];
+});
+
+export const getJobRoles = cache(async (): Promise<JobRole[]> => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("job_roles").select("*").order("sort_order").order("name");
+  return (data ?? []) as JobRole[];
 });
 
 export const getProjectTypes = cache(async (): Promise<ProjectType[]> => {

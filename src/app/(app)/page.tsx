@@ -1,11 +1,25 @@
 import Link from "next/link";
-import { FilterForm, LiveRefresh, TaskStatusSelect } from "@/components/client";
+import { takeRoleTask } from "./actions";
+import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { Empty, Flash, PageHeader } from "@/components/ui";
 import { addDays, formatDate, todayISO, weekStart } from "@/lib/dates";
-import { sp } from "@/lib/data";
+import { getJobRoles, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import type { TaskStatus } from "@/lib/types";
+
+type OpenSlot = {
+  id: string;
+  role_id: string;
+  task: {
+    id: string;
+    title: string;
+    status: TaskStatus;
+    due_date: string | null;
+    project: { id: string; name: string; company: { name: string } | null } | null;
+    task_assignees: { profile_id: string }[];
+  } | null;
+};
 
 type Row = {
   id: string;
@@ -29,7 +43,7 @@ export default async function MyWorkPage({
   const today = todayISO();
   const monday = weekStart(today);
 
-  const [{ data: tasks }, { data: hours }] = await Promise.all([
+  const [{ data: tasks }, { data: hours }, { data: myRoles }, jobRoles] = await Promise.all([
     supabase
       .from("tasks")
       .select(
@@ -44,7 +58,19 @@ export default async function MyWorkPage({
       .eq("user_id", me.id)
       .gte("work_date", monday)
       .lte("work_date", addDays(monday, 6)),
+    supabase.from("profile_job_roles").select("role_id").eq("profile_id", me.id),
+    getJobRoles(),
   ]);
+  const myRoleIds = (myRoles ?? []).map((r) => r.role_id as string);
+  const { data: slotData } = myRoleIds.length
+    ? await supabase
+        .from("task_role_slots")
+        .select("id, role_id, task:tasks(id, title, status, due_date, project:projects(id, name, company:companies(name)), task_assignees(profile_id))")
+        .in("role_id", myRoleIds)
+    : { data: [] };
+  const openWork = ((slotData ?? []) as unknown as OpenSlot[])
+    .filter((s) => s.task && s.task.status !== "done" && !s.task.task_assignees.some((a) => a.profile_id === me.id))
+    .sort((a, b) => (a.task!.due_date ?? "9999").localeCompare(b.task!.due_date ?? "9999"));
 
   const mine = (tasks ?? []) as unknown as Row[];
   const projectFilter = sp(params.project) ?? "";
@@ -71,7 +97,7 @@ export default async function MyWorkPage({
 
   return (
     <>
-      <LiveRefresh subs={[{ table: "tasks" }, { table: "task_assignees", filter: `profile_id=eq.${me.id}` }]} />
+      <LiveRefresh subs={[{ table: "tasks" }, { table: "task_assignees", filter: `profile_id=eq.${me.id}` }, { table: "task_role_slots" }]} />
       <PageHeader title={`Hi, ${me.full_name.split(" ")[0]}`} subtitle={filtered ? `${rows.length} of ${mine.length} open tasks assigned to you` : `${mine.length} open tasks assigned to you`}>
         <Link href="/time" className="card px-4 py-3 text-right hover:bg-stone-50">
           <span className="block text-xs uppercase tracking-wide text-stone-500">Logged this week</span>
@@ -104,6 +130,36 @@ export default async function MyWorkPage({
           )}
           {filtered && <Link href="/" className="btn">Clear filters</Link>}
         </FilterForm>
+      )}
+
+      {openWork.length > 0 && (
+        <section className="card mb-6 overflow-hidden border-amber-200">
+          <h2 className="border-b border-stone-200 bg-amber-50/60 px-4 py-3 text-sm font-semibold">
+            Open work for your roles <span className="font-normal text-stone-500">· {openWork.length}</span>
+          </h2>
+          <ul>
+            {openWork.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-3 last:border-0">
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                  {jobRoles.find((r) => r.id === s.role_id)?.name ?? "Role"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link href={`/tasks/${s.task!.id}`} className="font-medium hover:underline">{s.task!.title}</Link>
+                  <p className="truncate text-xs text-stone-500">
+                    {s.task!.project?.company?.name ? `${s.task!.project.company.name} · ` : ""}
+                    {s.task!.project?.name}
+                    {s.task!.due_date && ` · Due ${formatDate(s.task!.due_date)}`}
+                  </p>
+                </div>
+                <form action={takeRoleTask}>
+                  <input type="hidden" name="slot_id" value={s.id} />
+                  <input type="hidden" name="redirect_to" value="/" />
+                  <SubmitButton className="btn" pendingText="Taking…">Take it</SubmitButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {rows.length === 0 ? (

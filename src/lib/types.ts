@@ -8,10 +8,16 @@ export type Profile = {
   email: string;
   full_name: string;
   role: UserRole;
-  job_role: string | null;
   active: boolean;
   weekly_hours: number;
+  /** Present when loaded with getPeople(). */
+  job_roles?: { role_id: string; is_main: boolean }[];
 };
+
+export type JobRole = { id: string; name: string; active: boolean; sort_order: number };
+
+/** An open role on a task (or template task) that nobody has taken yet. */
+export type RoleSlot = { id: string; role_id: string };
 
 export type Company = {
   id: string;
@@ -48,6 +54,7 @@ export type Task = {
   title: string;
   description: string | null;
   assignee_ids: string[];
+  open_roles: RoleSlot[];
   status: TaskStatus;
   is_milestone: boolean;
   parent_task_id: string | null;
@@ -136,6 +143,7 @@ export type TemplateTask = {
   is_milestone: boolean;
   milestone_id: string | null;
   assignee_ids: string[];
+  open_roles: RoleSlot[];
   sort_order: number;
   version: number;
 };

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
-import { ASSIGNEES, assigneeLabel, withAssignees } from "@/lib/assignees";
+import { ASSIGNEES, assigneeLabel, openRoleNames, withAssignees } from "@/lib/assignees";
 import { csvResponse, slug } from "@/lib/csv";
-import { getPeople } from "@/lib/data";
+import { getJobRoles, getPeople } from "@/lib/data";
 import { formatTimestamp, todayISO } from "@/lib/dates";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskMatches } from "@/lib/list-filters";
 import { requireProfile } from "@/lib/session";
@@ -19,9 +19,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     supabase.from("time_entries").select("task_id, hours").eq("project_id", id),
     getPeople(),
   ]);
+  const jobRoles = await getJobRoles();
   if (!project) return new Response("Project not found.", { status: 404 });
 
-  const all = ((tasks ?? []) as (Omit<Task, "assignee_ids"> & { task_assignees: { profile_id: string }[] })[]).map(
+  const all = ((tasks ?? []) as (Omit<Task, "assignee_ids" | "open_roles"> & { task_assignees: { profile_id: string }[] })[]).map(
     withAssignees,
   ) as Task[];
   const title = new Map(all.map((t) => [t.id, t.title]));
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     t.milestone_id ? title.get(t.milestone_id) ?? "" : "",
     t.parent_task_id ? title.get(t.parent_task_id) ?? "" : "",
     assigneeLabel(t.assignee_ids, people, ""),
+    openRoleNames(t.open_roles, jobRoles).map((n) => n.replace(" (open)", "")).join(", "),
     TASK_STATUSES.find((s) => s.value === t.status)?.label ?? t.status,
     t.start_date ?? "",
     t.due_date ?? "",
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return csvResponse(
     `workhub-tasks-${slug(project.name)}-${today}.csv`,
-    ["Task", "Type", "Milestone", "Parent task", "Assignees", "Status", "Start", "Due", "Estimate (h)", "Hours logged", "Completed"],
+    ["Task", "Type", "Milestone", "Parent task", "Assignees", "Open roles", "Status", "Start", "Due", "Estimate (h)", "Hours logged", "Completed"],
     rows,
   );
 }

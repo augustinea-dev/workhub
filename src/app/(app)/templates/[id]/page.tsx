@@ -2,23 +2,26 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTemplateTask, deleteTemplate, deleteTemplateTask, updateTemplate, updateTemplateTask } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
+import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { Empty, Flash } from "@/components/ui";
 import { addWorkingDays, formatDay, isValidISODate, todayISO } from "@/lib/dates";
 import { pickerOptions } from "@/lib/assignees";
-import { getPeople, sp } from "@/lib/data";
+import { getJobRoles, getPeople, sp } from "@/lib/data";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, ProjectTemplate, TemplateTask } from "@/lib/types";
+import type { JobRole, Profile, ProjectTemplate, TemplateTask } from "@/lib/types";
 
 function TaskFields({
   task,
   milestones,
   people,
+  roles,
 }: {
   task?: TemplateTask;
   milestones: TemplateTask[];
   people: Profile[];
+  roles: JobRole[];
 }) {
   const kind = task?.is_milestone ? "milestone" : task?.milestone_id ? `in:${task.milestone_id}` : "";
   const suffix = task?.id ?? "new";
@@ -64,6 +67,9 @@ function TaskFields({
           label="Default assignees"
         />
       </div>
+      <div className="md:col-span-2 xl:col-span-1">
+        <RoleSlotsPicker key={task?.version ?? "new"} roles={roles} defaultValue={(task?.open_roles ?? []).map((s) => s.role_id)} />
+      </div>
       <details className="md:col-span-full" open={!!task?.description}>
         <summary className="cursor-pointer text-xs font-medium text-stone-500">Description</summary>
         <textarea name="description" rows={2} defaultValue={task?.description ?? ""} className="input mt-1 w-full" />
@@ -85,16 +91,24 @@ export default async function TemplatePage({
   const supabase = await createClient();
   const [{ data: template }, { data: taskData }, people] = await Promise.all([
     supabase.from("project_templates").select("*").eq("id", id).maybeSingle(),
-    supabase.from("template_tasks").select("*, template_task_assignees(profile_id)").eq("template_id", id),
+    supabase.from("template_tasks").select("*, template_task_assignees(profile_id), template_task_role_slots(id, role_id)").eq("template_id", id),
     getPeople(),
   ]);
+  const jobRoles = await getJobRoles();
   if (!template) notFound();
 
   const t = template as ProjectTemplate;
   const tasks = (
-    (taskData ?? []) as (Omit<TemplateTask, "assignee_ids"> & { template_task_assignees: { profile_id: string }[] })[]
+    (taskData ?? []) as (Omit<TemplateTask, "assignee_ids" | "open_roles"> & {
+      template_task_assignees: { profile_id: string }[];
+      template_task_role_slots: { id: string; role_id: string }[];
+    })[]
   )
-    .map(({ template_task_assignees, ...rest }) => ({ ...rest, assignee_ids: template_task_assignees.map((a) => a.profile_id) }))
+    .map(({ template_task_assignees, template_task_role_slots, ...rest }) => ({
+      ...rest,
+      assignee_ids: template_task_assignees.map((a) => a.profile_id),
+      open_roles: template_task_role_slots,
+    }))
     .sort(
     (a, b) => a.start_day - b.start_day || a.due_day - b.due_day || a.sort_order - b.sort_order,
   );
@@ -159,7 +173,7 @@ export default async function TemplatePage({
                         <input type="hidden" name="id" value={task.id} />
                         <input type="hidden" name="template_id" value={id} />
                         <input type="hidden" name="version" value={task.version} />
-                        <TaskFields task={task} milestones={milestones} people={people} />
+                        <TaskFields task={task} milestones={milestones} people={people} roles={jobRoles} />
                         <div className="md:col-span-full">
                           <SubmitButton className="btn">Save</SubmitButton>
                         </div>
@@ -180,7 +194,7 @@ export default async function TemplatePage({
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Add a task</p>
             <input type="hidden" name="template_id" value={id} />
             <div className={grid}>
-              <TaskFields milestones={milestones} people={people} />
+              <TaskFields milestones={milestones} people={people} roles={jobRoles} />
               <div className="md:col-span-full">
                 <SubmitButton pendingText="Adding…">Add task</SubmitButton>
               </div>

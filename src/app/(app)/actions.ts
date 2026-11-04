@@ -118,6 +118,75 @@ async function syncAssignees(
   return null;
 }
 
+/** Make a task's (or template task's) open role slots match `roleIds`, counting repeats. */
+async function syncRoleSlots(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: "task_role_slots" | "template_task_role_slots",
+  key: "task_id" | "template_task_id",
+  id: string,
+  roleIds: string[],
+): Promise<string | null> {
+  const { data: current, error } = await supabase.from(table).select("id, role_id").eq(key, id);
+  if (error) return error.message;
+  const want = new Map<string, number>();
+  for (const r of roleIds) want.set(r, (want.get(r) ?? 0) + 1);
+  const remove: string[] = [];
+  for (const slot of current ?? []) {
+    const left = want.get(slot.role_id) ?? 0;
+    if (left > 0) want.set(slot.role_id, left - 1);
+    else remove.push(slot.id);
+  }
+  if (remove.length) {
+    const { error: e } = await supabase.from(table).delete().in("id", remove);
+    if (e) return e.message;
+  }
+  const add = [...want.entries()].flatMap(([role_id, n]) => Array.from({ length: n }, () => ({ [key]: id, role_id })));
+  if (add.length) {
+    const { error: e } = await supabase.from(table).insert(add);
+    if (e) return e.message;
+  }
+  return null;
+}
+
+function roleSlotIdsFrom(fd: FormData): string[] {
+  return fd.getAll("role_slot_ids").map(String).filter(Boolean);
+}
+
+// ---------- job roles ----------
+export async function takeRoleTask(fd: FormData) {
+  await requireProfile();
+  const back = safePath(str(fd, "redirect_to"), "/");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("take_role_task", { p_slot: str(fd, "slot_id") });
+  if (error || !data) fail(back, error?.message ?? "Couldn't take that work.");
+  done(back, "It's yours. The task is now on your My Work.");
+}
+
+export async function assignRoleSlot(fd: FormData) {
+  await requireAdmin();
+  const back = safePath(str(fd, "redirect_to"), "/");
+  const person = str(fd, "profile_id");
+  if (!person) fail(back, "Pick someone to fill the role.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("assign_role_slot", { p_slot: str(fd, "slot_id"), p_profile: person });
+  if (error) fail(back, error.message);
+  done(back, "Role filled.");
+}
+
+export async function saveJobRole(fd: FormData) {
+  await requireAdmin();
+  const name = str(fd, "name");
+  if (!name) fail("/admin", "Give the role a name.");
+  const row = { name, active: str(fd, "active") === "on", sort_order: Number.parseInt(str(fd, "sort_order"), 10) || 0 };
+  const supabase = await createClient();
+  const id = str(fd, "id");
+  const { error } = id
+    ? await supabase.from("job_roles").update(row).eq("id", id)
+    : await supabase.from("job_roles").insert(row);
+  if (error) fail("/admin", error.code === "23505" ? `${name} already exists.` : error.message);
+  done("/admin", `Saved the ${name} role.`);
+}
+
 // ---------- settings (admin) ----------
 export async function updateNextReference(fd: FormData) {
   await requireAdmin();
@@ -291,7 +360,9 @@ export async function createTask(fd: FormData) {
     .select("id")
     .single();
   if (error || !created) fail(back, error?.message ?? "Couldn't add the task.");
-  const assignError = await syncAssignees(supabase, "task_assignees", "task_id", created.id, assigneeIdsFrom(fd));
+  const assignError =
+    (await syncAssignees(supabase, "task_assignees", "task_id", created.id, assigneeIdsFrom(fd))) ??
+    (await syncRoleSlots(supabase, "task_role_slots", "task_id", created.id, roleSlotIdsFrom(fd)));
   if (assignError) fail(back, `Added “${title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Added “${title}”.`);
 }
@@ -325,7 +396,9 @@ export async function updateTask(fd: FormData) {
     .select("id");
   if (error) fail(path, error.message);
   if (!data?.length) fail(path, CONFLICT);
-  const assignError = await syncAssignees(supabase, "task_assignees", "task_id", id, assigneeIdsFrom(fd));
+  const assignError =
+    (await syncAssignees(supabase, "task_assignees", "task_id", id, assigneeIdsFrom(fd))) ??
+    (await syncRoleSlots(supabase, "task_role_slots", "task_id", id, roleSlotIdsFrom(fd)));
   if (assignError) fail(path, `Task saved, but its assignees couldn't be saved: ${assignError}`);
   done(path, "Task saved.");
 }
@@ -453,7 +526,9 @@ export async function createTemplateTask(fd: FormData) {
     .select("id")
     .single();
   if (error || !created) fail(back, error?.message ?? "Couldn't add the task.");
-  const assignError = await syncAssignees(supabase, "template_task_assignees", "template_task_id", created.id, assigneeIdsFrom(fd));
+  const assignError =
+    (await syncAssignees(supabase, "template_task_assignees", "template_task_id", created.id, assigneeIdsFrom(fd))) ??
+    (await syncRoleSlots(supabase, "template_task_role_slots", "template_task_id", created.id, roleSlotIdsFrom(fd)));
   if (assignError) fail(back, `Added “${fields.title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Added “${fields.title}”.`);
 }
@@ -471,7 +546,9 @@ export async function updateTemplateTask(fd: FormData) {
     .select("id");
   if (error) fail(back, error.message);
   if (!data?.length) fail(back, CONFLICT);
-  const assignError = await syncAssignees(supabase, "template_task_assignees", "template_task_id", str(fd, "id"), assigneeIdsFrom(fd));
+  const assignError =
+    (await syncAssignees(supabase, "template_task_assignees", "template_task_id", str(fd, "id"), assigneeIdsFrom(fd))) ??
+    (await syncRoleSlots(supabase, "template_task_role_slots", "template_task_id", str(fd, "id"), roleSlotIdsFrom(fd)));
   if (assignError) fail(back, `Saved “${fields.title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Saved “${fields.title}”.`);
 }
@@ -646,8 +723,18 @@ export async function updateMember(fd: FormData) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: str(fd, "full_name") || undefined, job_role: opt(fd, "job_role"), role, active, weekly_hours: weeklyHours })
+    .update({ full_name: str(fd, "full_name") || undefined, role, active, weekly_hours: weeklyHours })
     .eq("id", id);
   if (error) fail("/admin", error.message);
+  const roleIds = [...new Set(fd.getAll("role_ids").map(String).filter(Boolean))];
+  const mainRole = roleIds.includes(str(fd, "main_role_id")) ? str(fd, "main_role_id") : roleIds[0];
+  const { error: clearError } = await supabase.from("profile_job_roles").delete().eq("profile_id", id);
+  if (clearError) fail("/admin", clearError.message);
+  if (roleIds.length) {
+    const { error: rolesError } = await supabase
+      .from("profile_job_roles")
+      .insert(roleIds.map((role_id) => ({ profile_id: id, role_id, is_main: role_id === mainRole })));
+    if (rolesError) fail("/admin", rolesError.message);
+  }
   done("/admin", "Saved.");
 }

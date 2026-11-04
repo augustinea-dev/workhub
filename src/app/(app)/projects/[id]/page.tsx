@@ -2,16 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createTask, deleteProject, saveProjectAsTemplate, updateProject } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
+import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { Board, type BoardCard } from "@/components/board";
 import { ConfirmDelete, FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { ProjectNameFields } from "@/components/project-name-fields";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
-import { ASSIGNEES, assigneeLabel, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
+import { ASSIGNEES, assigneeLabel, openRoleNames, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
-import { getCompanies, getPeople, getProjectTypes, nameOf, personOption, sp } from "@/lib/data";
+import { getCompanies, getJobRoles, getPeople, getProjectTypes, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { PROJECT_STATUSES, TASK_STATUSES, type Project, type Task } from "@/lib/types";
@@ -36,11 +37,11 @@ export default async function ProjectPage({
     getPeople(),
     getCompanies(),
   ]);
-  const projectTypes = await getProjectTypes();
+  const [projectTypes, jobRoles] = await Promise.all([getProjectTypes(), getJobRoles()]);
   if (!project) notFound();
 
   const p = project as Project;
-  const list = ((tasks ?? []) as (Omit<Task, "assignee_ids"> & { task_assignees: { profile_id: string }[] })[]).map(
+  const list = ((tasks ?? []) as (Omit<Task, "assignee_ids" | "open_roles"> & { task_assignees: { profile_id: string }[] })[]).map(
     withAssignees,
   ) as Task[];
   const open = list.filter((t) => t.status !== "done");
@@ -121,7 +122,7 @@ export default async function ProjectPage({
         isMilestone: t.is_milestone,
         milestone: milestoneOf(t) ? milestoneTitle.get(milestoneOf(t)!) ?? null : null,
         parent: t.parent_task_id ? byId.get(t.parent_task_id)?.title ?? null : null,
-        assignee: shortAssigneeLabel(t.assignee_ids, people, me.id),
+        assignee: shortAssigneeLabel(t.assignee_ids, people, me.id, openRoleNames(t.open_roles, jobRoles)),
         isMine: t.assignee_ids.includes(me.id),
         due: t.due_date ? formatDate(t.due_date) : null,
         late: !!t.due_date && t.due_date < today && t.status !== "done",
@@ -154,7 +155,7 @@ export default async function ProjectPage({
           )}
         </td>
         <td className={`table-cell ${t.assignee_ids.includes(me.id) ? "font-medium" : "text-stone-600"}`}>
-          {assigneeLabel(t.assignee_ids, people, me.id)}
+          {assigneeLabel(t.assignee_ids, people, me.id, openRoleNames(t.open_roles, jobRoles))}
         </td>
         <td className={`table-cell whitespace-nowrap ${late ? "font-medium text-red-700" : "text-stone-600"}`}>
           {formatDate(t.due_date)}
@@ -172,7 +173,7 @@ export default async function ProjectPage({
 
   return (
     <>
-      <LiveRefresh subs={[{ table: "tasks", filter: `project_id=eq.${id}` }, { table: "task_assignees" }]} />
+      <LiveRefresh subs={[{ table: "tasks", filter: `project_id=eq.${id}` }, { table: "task_assignees" }, { table: "task_role_slots" }]} />
       <p className="mb-2 text-sm text-stone-500">
         <Link href="/projects" className="hover:underline">Projects</Link>
         {company && <> · {company.name}</>}
@@ -377,6 +378,9 @@ export default async function ProjectPage({
                   <label className="label" htmlFor="new_task_due">Due</label>
                   <input id="new_task_due" name="due_date" type="date" className="input w-full" />
                 </div>
+                <div className="md:col-span-3">
+                  <RoleSlotsPicker roles={jobRoles} />
+                </div>
                 {milestoneGroups.length > 0 && (
                   <div className="md:col-span-3">
                     <label className="label" htmlFor="new_task_milestone">Milestone</label>
@@ -391,9 +395,7 @@ export default async function ProjectPage({
                     </select>
                   </div>
                 )}
-                <label
-                  className={`flex items-center gap-2 py-2 text-xs text-stone-600 ${milestoneGroups.length > 0 ? "md:col-span-2" : "md:col-span-5"}`}
-                >
+                <label className="flex items-center gap-2 py-2 text-xs text-stone-600 md:col-span-5">
                   <input type="checkbox" name="is_milestone" /> This task is a milestone
                 </label>
                 <SubmitButton pendingText="Adding…">Add task</SubmitButton>

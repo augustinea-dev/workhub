@@ -1,8 +1,8 @@
-import { saveProjectType, updateMember, updateNextReference } from "../actions";
+import { saveJobRole, saveProjectType, updateMember, updateNextReference } from "../actions";
 import { SubmitButton } from "@/components/client";
 import { Flash, PageHeader } from "@/components/ui";
 import { formatTimestamp } from "@/lib/dates";
-import { getNextReference, getPeople, getProjectTypes, nameOf, sp } from "@/lib/data";
+import { getJobRoles, getNextReference, getPeople, getProjectTypes, nameOf, sp } from "@/lib/data";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,7 +23,13 @@ export default async function AdminPage({
 }) {
   const params = await searchParams;
   const me = await requireAdmin();
-  const [people, projectTypes, nextReference] = await Promise.all([getPeople(), getProjectTypes(), getNextReference()]);
+  const [people, projectTypes, nextReference, jobRoles] = await Promise.all([
+    getPeople(),
+    getProjectTypes(),
+    getNextReference(),
+    getJobRoles(),
+  ]);
+  const roleName = (id: string) => jobRoles.find((r) => r.id === id)?.name ?? "Role";
   const supabase = await createClient();
   const { data: audit } = await supabase
     .from("audit_log")
@@ -36,7 +42,7 @@ export default async function AdminPage({
       <PageHeader title="Admin" subtitle="People and recent changes" />
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
-      <section className="card mb-6 overflow-x-auto">
+      <section className="card mb-6">
         <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">People</h2>
         <ul>
           {people.map((p) => (
@@ -45,7 +51,39 @@ export default async function AdminPage({
                 <input type="hidden" name="id" value={p.id} />
                 <input name="full_name" defaultValue={p.full_name} aria-label="Full name" className="input w-48" />
                 <span className="w-56 truncate text-sm text-stone-500">{p.email}</span>
-                <input name="job_role" defaultValue={p.job_role ?? ""} placeholder="Job role" aria-label="Job role" className="input w-40" />
+                <details className="relative">
+                  <summary className="input flex w-56 cursor-pointer list-none items-center truncate [&::-webkit-details-marker]:hidden">
+                    <span className="truncate">
+                      {p.job_roles?.length
+                        ? [...p.job_roles]
+                            .sort((a, b) => Number(b.is_main) - Number(a.is_main))
+                            .map((r) => (r.is_main ? `${roleName(r.role_id)} (main)` : roleName(r.role_id)))
+                            .join(", ")
+                        : <span className="text-stone-400">No roles</span>}
+                    </span>
+                  </summary>
+                  <div className="absolute z-20 mt-1 w-72 rounded-lg border border-stone-200 bg-white p-3 shadow-lg">
+                    <p className="mb-2 text-xs text-stone-500">Tick their roles and pick the main one.</p>
+                    <ul className="space-y-1.5">
+                      {jobRoles
+                        .filter((r) => r.active || p.job_roles?.some((x) => x.role_id === r.id))
+                        .map((r) => {
+                          const held = p.job_roles?.find((x) => x.role_id === r.id);
+                          return (
+                            <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                              <label className="flex items-center gap-2">
+                                <input type="checkbox" name="role_ids" value={r.id} defaultChecked={!!held} />
+                                {r.name}
+                              </label>
+                              <label className="flex items-center gap-1 text-xs text-stone-500">
+                                <input type="radio" name="main_role_id" value={r.id} defaultChecked={!!held?.is_main} /> Main
+                              </label>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </div>
+                </details>
                 <label className="flex items-center gap-1 text-sm text-stone-600">
                   <input
                     name="weekly_hours"
@@ -78,6 +116,36 @@ export default async function AdminPage({
           part-time staff). To add someone: Supabase dashboard → Authentication → Users → <strong>Invite user</strong>. They appear here
           after they accept, as a User.
         </p>
+      </section>
+
+      <section className="card mb-6 overflow-x-auto">
+        <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">Job roles</h2>
+        <div className="space-y-2 px-4 py-3">
+          <p className="mb-1 text-xs text-stone-500">
+            Roles people hold. Tasks can be assigned to a role, and anyone with it can take the work from My Work. Untick
+            Active to retire a role; roles still used on tasks can&apos;t be deleted.
+          </p>
+          {jobRoles.map((r) => (
+            <form key={r.id} action={saveJobRole} className="flex flex-wrap items-center gap-2">
+              <input type="hidden" name="id" value={r.id} />
+              <input name="name" required defaultValue={r.name} aria-label={`Name for ${r.name}`} className="input w-56 py-1.5" />
+              <input name="sort_order" type="number" defaultValue={r.sort_order} aria-label={`Order for ${r.name}`} className="input w-20 py-1.5" />
+              <label className="flex items-center gap-1 text-sm">
+                <input type="checkbox" name="active" value="on" defaultChecked={r.active} /> Active
+              </label>
+              <span className="text-xs text-stone-400">
+                {people.filter((p) => p.job_roles?.some((x) => x.role_id === r.id)).length} people
+              </span>
+              <SubmitButton className="btn py-1.5">Save</SubmitButton>
+            </form>
+          ))}
+          <form action={saveJobRole} className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
+            <input type="hidden" name="active" value="on" />
+            <input name="name" required placeholder="New role, e.g. Producer" aria-label="New role name" className="input w-56 py-1.5" />
+            <input name="sort_order" type="number" defaultValue={jobRoles.length + 1} aria-label="New role order" className="input w-20 py-1.5" />
+            <SubmitButton className="btn py-1.5" pendingText="Adding…">Add role</SubmitButton>
+          </form>
+        </div>
       </section>
 
       <section className="card mb-6 overflow-x-auto">

@@ -90,6 +90,21 @@ A task can have **several people**, like in Workfront.
 - **Everyone:** sees all of a task's assignees (lists and the board show "You, Jeremy" or "Cathy +2"). My Work shows every task you're one of the assignees on, and "Mine" filters do the same. **Any** assignee can change the task's status and tick its subtasks done.
 - **Admins only:** add or remove assignees with the people picker on any task form (type a name, pick from the list; × removes someone). Each person added gets a "You were assigned" notice. Templates have default assignees the same way, and new projects copy them (inactive people are left off).
 
+## Job roles and open work
+
+People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Partnership, Digital Strategist to start), one of them their main role. A task can be assigned to a role as well as, or instead of, people, like "Resource: Designer" in Workfront.
+
+- **Everyone:**
+  - Open roles show next to a task's people, for example "Jeremy, Designer (open)".
+  - **My Work → Open work for your roles** lists unfinished tasks waiting for one of your roles. **Take it** puts you on the task (as that role) and removes the open slot. You can only take work for roles you hold.
+  - On a task page, the Details card lists open roles with a **Take it** button when it's one of yours.
+- **Admins only:**
+  - Manage the roles list on the Admin page (add, rename, reorder, retire). Roles still used on tasks can't be deleted, only retired.
+  - Give each person their roles and main role (Admin page, **Roles** on each person).
+  - Add open roles to a task (add-task form, or **Edit task**); the same role can be added more than once when several people are needed.
+  - **Fill** an open role with a specific person from the task's Details card (people with that role are listed first). They're notified.
+  - Templates can have open roles too, and new projects carry them over.
+
 ## Task page
 
 **Where:** open any task.
@@ -204,7 +219,8 @@ Files open in Excel or Google Sheets.
 
 **Where:** Admin in the sidebar.
 
-- **People:** edit name, job role, hours per week, access (Admin or User) and Active. You can't remove your own admin access.
+- **People:** edit name, roles (with a main role), hours per week, access (Admin or User) and Active. You can't remove your own admin access.
+- **Job roles:** the list of roles people can hold and tasks can ask for.
 - **Project names:** the next reference number, and the list of project types.
 - **Recent changes:** the latest changes across Workhub and who made them.
 
