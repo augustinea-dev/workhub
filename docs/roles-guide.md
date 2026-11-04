@@ -1,0 +1,153 @@
+# Workhub: what Admins and Users can do
+
+Working notes for the future onboarding guides. Each section covers one part of Workhub: where to find it, what everyone can do, and what only Admins can do. Keep it in plain language and update it whenever a feature lands or a permission changes.
+
+- **Admin**: manages clients, projects, tasks, templates, people and timesheet approvals.
+- **User**: everyone else (shown as "Member" on the Admin page). Works on their tasks, posts updates and logs time.
+
+Everyone can see all projects and tasks. There is no client access: Workhub is staff only.
+
+---
+
+## Signing in
+
+**Where:** the login page.
+
+- **Everyone:** enter your work email and use the sign-in link that arrives by email. There are no passwords.
+- **Admins:** invite new people from the Supabase dashboard (Authentication, Users, Invite user). They appear on the Admin page as a User after they accept.
+- People marked inactive can't sign in.
+
+## My Work (home page)
+
+**Where:** My Work in the sidebar.
+
+- **Everyone:** see your open tasks, grouped into Overdue, Due this week, Later and No due date. Change a task's status from the list. The "Logged this week" card shows your hours for Monday to Sunday and links to the Time page.
+
+## Projects list
+
+**Where:** Projects in the sidebar.
+
+- **Everyone:** see Open or All projects, each with its client, owner, status, next milestone (with its date and health), open task count and due date.
+- **Admins only:** **+ New project**. Set the name, client, owner, start and due dates. Optionally pick **Start from template**: a start date is then required, and leaving Due empty uses the template's length.
+
+## Project page
+
+**Where:** open any project.
+
+- **Everyone:**
+  - The header shows the owner, due date, hours logged (and billable) and the next milestone.
+  - **List** view: tasks grouped under their milestones. Each milestone shows "3 of 5 done" and its health. Tasks with no milestone are listed under "Not in a milestone".
+  - **Board** view: see [Board](#board).
+  - Change the status of tasks assigned to you.
+- **Admins only:**
+  - Change the status of any task.
+  - **Add a task:** title, assignee, start, due, milestone, and whether the task is itself a milestone.
+  - Edit project details: name, status, owner, client, dates and description.
+  - **Save as template:** copies the project's top-level tasks (subtasks are skipped), milestones, estimates and assignees into a new template.
+  - Delete the project and its tasks.
+
+## Board
+
+**Where:** a project page, then **Board** at the top right of Tasks.
+
+- **Everyone:**
+  - Columns: To do, In progress, In review, Done. Done shows the 10 most recently finished, with "Show all".
+  - Filter by **Everyone** or **Mine**, and by milestone.
+  - Move cards that are assigned to you: drag them, or use the status menu on the card (works on phones and keyboards). Other cards show "Assignee or Admin can move".
+- **Admins only:** move any card.
+
+## Task page
+
+**Where:** open any task.
+
+- **Everyone:**
+  - Assigned to, due date in plain words ("tomorrow", "overdue by 2 days"), description, subtasks, and for a milestone the tasks in it.
+  - Side cards: Details (project, client, status, assignee, milestone), Dates, Hours (planned, logged, yours, remaining), History.
+  - Post updates and log time (see below).
+- **If the task is assigned to you:** a **Your status** bar with one-click To do, In progress, In review and Done.
+- **If it isn't:** a note saying who it's assigned to. You can still post updates and log time.
+- **Admins only:**
+  - Edit everything: title, status, start and due dates, assignee, milestone, estimate, description, and whether it's a milestone.
+  - Delete the task.
+  - Delete updates.
+
+## Milestones
+
+- **Everyone:** a milestone is a task marked with ◆. Other tasks can belong to it. Health:
+  - **On track:** nothing below applies.
+  - **At risk:** one of its open tasks is overdue, or due after the milestone date. The reason is shown.
+  - **Late:** the milestone date has passed and it isn't done.
+- **Admins only:** mark a task as a milestone and choose which milestone a task belongs to. Unmarking a milestone ungroups its tasks.
+
+## Updates and @mentions
+
+**Where:** the Updates section on a task.
+
+- **Everyone:**
+  - Post progress notes, questions and handoffs. Updates can't be edited once posted.
+  - Type **@** to mention someone (pick from the list by name or email). They get a **Mention** in their inbox, and their name is highlighted in the update.
+  - For files, paste a Dropbox link in an update. Workhub doesn't store files.
+- **Admins only:** delete updates.
+
+## Logging time
+
+**Where:** a task's Time section, or the Time page (for project-level time).
+
+- **Everyone:**
+  - Log hours in 15-minute steps with a date, hour type (Billable, Non-billable, Admin, Meeting, PTO) and optional note.
+  - Edit or remove your own entries, unless that week's timesheet is submitted or approved.
+- **Admins only:** edit or remove anyone's entries (same lock applies), and view anyone's week on the Time page.
+
+## Timesheets
+
+**Where:** the Time page. Weeks run Monday to Sunday (Pacific time).
+
+- **Everyone:**
+  - The **Timesheet** panel shows the week's status: Open, Submitted, Approved or Returned.
+  - **Submit week** once you've logged at least your hours per week (40 unless an Admin set something else). PTO counts. Weeks that haven't started can't be submitted.
+  - Submitted and approved weeks are **locked**: no adding, editing or removing time.
+  - **Recall to edit** a submitted week until an Admin decides.
+  - A **returned** week shows the Admin's note. Fix it and submit again.
+  - You get an inbox notice when your week is approved, returned or reopened.
+- **Admins only:**
+  - **Approvals** (button on the Time page, with a count): every submitted week, with total and billable hours. **Review** opens the week; **Approve** from the list or the week.
+  - **Return** a week with a note (required) so the person can fix it.
+  - **Reopen** an approved week to allow changes. An Admin must reopen a week before changing its time.
+  - Set each person's **hours per week** on the Admin page (lower it for part-time staff).
+
+## Inbox
+
+**Where:** Inbox in the sidebar (the badge shows unread).
+
+- **Everyone:** notices for tasks assigned to you, new updates on tasks you're involved in (assignee, project owner, or you've posted), mentions, and timesheet decisions. Opening one marks it read and takes you to the task or week. **Mark all read** clears the badge.
+
+## Templates (Admins only)
+
+**Where:** Templates in the sidebar.
+
+- Create a template, then add its tasks: title, start day and due day (working days from the project start, Monday to Friday; day 0 is the start), hours, type (Task, Milestone, or part of a milestone), default assignee and description.
+- **Preview dates for a start on** shows the real dates for any start date.
+- Use a template from **+ New project** on the Projects page. Default assignees who are inactive are left Unassigned.
+- Changing or deleting a template doesn't affect projects already created from it.
+- Users don't see templates.
+
+## Clients
+
+**Where:** Clients in the sidebar.
+
+- **Everyone:** see each client with its active and total projects.
+- **Admins only:** add clients. Projects are linked to a client when they're created or edited.
+
+## Admin page (Admins only)
+
+**Where:** Admin in the sidebar.
+
+- **People:** edit name, job role, hours per week, access (Admin or Member) and Active. You can't remove your own admin access.
+- **Recent changes:** the latest changes across Workhub and who made them.
+
+## Good to know
+
+- **Live updates:** pages refresh on their own when someone else changes a task, update, timesheet or your inbox.
+- **Safe saves:** if someone else saved first, you'll see a message and nothing is overwritten. Make your change again.
+- **Time zone:** "today" and "this week" use Pacific time.
+- **Not yet available:** email notifications, Microsoft sign-in, file storage (use Dropbox links), CSV/Excel export.
