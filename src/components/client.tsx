@@ -31,8 +31,8 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
   return (
     <Link
       href={href}
-      className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium ${
-        active ? "bg-stone-900 text-white" : "text-stone-700 hover:bg-stone-200/60"
+      className={`flex items-center justify-between rounded-md border-l-[3px] px-3 py-2 text-sm font-medium ${
+        active ? "border-blue-500 bg-white/10 text-white" : "border-transparent text-white/75 hover:bg-white/5 hover:text-white"
       }`}
     >
       {children}

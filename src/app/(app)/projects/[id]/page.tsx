@@ -6,7 +6,7 @@ import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { Board, type BoardCard } from "@/components/board";
 import { ConfirmDelete, FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { ProjectNameFields } from "@/components/project-name-fields";
-import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, TaskBadge } from "@/components/ui";
+import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, ProjectDot, TaskBadge } from "@/components/ui";
 import { ASSIGNEES, assigneeLabel, openRoleNames, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
@@ -181,27 +181,35 @@ export default async function ProjectPage({
         {company && <> · {company.name}</>}
       </p>
       <PageHeader
-        title={p.name}
-        subtitle={
-          <span className="flex flex-wrap items-center gap-3">
-            <ProjectBadge status={p.status} />
-            <span>Owner: {nameOf(people, p.owner_id)}</span>
-            <span>Due {formatDate(p.due_date)}</span>
-            {next && (
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <span>
-                  Next milestone:{" "}
-                  <Link href={`/tasks/${next.milestone.id}`} className="font-medium text-stone-900 hover:underline">
-                    ◆ {next.milestone.title}
-                  </Link>
-                  {next.milestone.due_date &&
-                    `, ${formatDate(next.milestone.due_date)} (${relativeDay(next.milestone.due_date, today)})`}
-                </span>
-                <HealthBadge health={next.health} />
-              </span>
-            )}
-            <span>{totalHours.toFixed(1)} h logged ({billable.toFixed(1)} billable)</span>
+        title={
+          <span className="flex items-center gap-2.5">
+            <ProjectDot id={p.id} size="lg" />
+            {p.title || p.name}
           </span>
+        }
+        subtitle={
+          <>
+            {p.title && p.title !== p.name && <span className="mb-2 block text-sm text-stone-500">{p.name}</span>}
+            <span className="flex flex-wrap items-center gap-3">
+              <ProjectBadge status={p.status} />
+              <span>Owner: {nameOf(people, p.owner_id)}</span>
+              <span>Due {formatDate(p.due_date)}</span>
+              {next && (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span>
+                    Next milestone:{" "}
+                    <Link href={`/tasks/${next.milestone.id}`} className="font-medium text-stone-900 hover:underline">
+                      ◆ {next.milestone.title}
+                    </Link>
+                    {next.milestone.due_date &&
+                      `, ${formatDate(next.milestone.due_date)} (${relativeDay(next.milestone.due_date, today)})`}
+                  </span>
+                  <HealthBadge health={next.health} />
+                </span>
+              )}
+              <span>{totalHours.toFixed(1)} h logged ({billable.toFixed(1)} billable)</span>
+            </span>
+          </>
         }
       />
       <Flash error={sp(query.error)} notice={sp(query.notice)} />

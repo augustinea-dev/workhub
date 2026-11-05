@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Brand colours from the Augustine logo; they stand in for blue across the app. */
+@theme {
+  --color-blue-50: #fcf1f7;
+  --color-blue-100: #f8deec;
+  --color-blue-200: #f0b9d8;
+  --color-blue-300: #e386bb;
+  --color-blue-400: #d64d97;
+  --color-blue-500: #d4007e;
+  --color-blue-600: #b3006b;
+  --color-blue-700: #94005f;
+  --color-blue-800: #77005d;
+  --color-blue-900: #5a0c5e;
+  --color-blue-950: #3a0a45;
+  --color-sidebar: #1a1a1a;
+}
+
 @layer base {
   body {
     @apply bg-stone-50 text-stone-900 antialiased;

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { takeRoleTask } from "./actions";
 import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { QuickLogRow } from "@/components/quick-log-row";
-import { Empty, Flash, PageHeader } from "@/components/ui";
+import { Empty, Flash, PageHeader, ProjectDot } from "@/components/ui";
 import { addDays, formatDate, todayISO, weekStart } from "@/lib/dates";
 import { getJobRoles, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
@@ -204,7 +204,8 @@ export default async function MyWorkPage({
                               {t.is_milestone && <span title="Milestone">◆ </span>}
                               {t.title}
                             </Link>
-                            <p className="truncate text-xs text-stone-500">
+                            <p className="flex items-center gap-1.5 truncate text-xs text-stone-500">
+                              {t.project && <ProjectDot id={t.project.id} />}
                               {t.project?.company?.name ? `${t.project.company.name} · ` : ""}
                               {t.project?.name}
                               {t.parent && ` › ${t.parent.title}`}

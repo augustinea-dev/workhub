@@ -15,12 +15,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen md:flex">
-      <aside className="border-b border-stone-200 bg-stone-100 md:sticky md:top-0 md:h-screen md:w-56 md:shrink-0 md:border-b-0 md:border-r">
+      <aside className="bg-sidebar text-white md:sticky md:top-0 md:h-screen md:w-56 md:shrink-0">
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <Image src="/augustine-mark.png" alt="" width={28} height={28} priority className="shrink-0" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white">
+            <Image src="/augustine-mark.png" alt="" width={26} height={26} priority />
+          </span>
           <div>
             <p className="text-lg font-semibold leading-tight">Workhub</p>
-            <p className="hidden text-xs text-stone-500 md:block">Augustine Agency</p>
+            <p className="hidden text-xs text-white/60 md:block">Augustine Agency</p>
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-2 pb-3 md:flex-col md:pb-0">
@@ -31,20 +33,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLink href="/inbox">
             Inbox
             {!!unread && (
-              <span className="ml-2 rounded-full bg-blue-700 px-2 text-xs font-semibold text-white">{unread}</span>
+              <span className="ml-2 rounded-full bg-blue-500 px-2 text-xs font-semibold text-white">{unread}</span>
             )}
           </NavLink>
           {me.role === "admin" && <NavLink href="/templates">Templates</NavLink>}
           {me.role === "admin" && <NavLink href="/admin">Admin</NavLink>}
         </nav>
-        <div className="hidden border-t border-stone-200 px-4 py-4 md:absolute md:bottom-0 md:block md:w-56">
+        <div className="hidden border-t border-white/10 px-4 py-4 md:absolute md:bottom-0 md:block md:w-56">
           <p className="truncate text-sm font-medium">{me.full_name}</p>
-          <p className="truncate text-xs text-stone-500">{me.email}</p>
-          <Link href="/settings" className="mt-2 block text-xs font-medium text-stone-600 hover:text-stone-900">
+          <p className="truncate text-xs text-white/60">{me.email}</p>
+          <Link href="/settings" className="mt-2 block text-xs font-medium text-white/70 hover:text-white">
             Notification settings
           </Link>
           <form action="/auth/signout" method="post" className="mt-2">
-            <button className="text-xs font-medium text-stone-600 hover:text-stone-900">Sign out</button>
+            <button className="text-xs font-medium text-white/70 hover:text-white">Sign out</button>
           </form>
         </div>
       </aside>

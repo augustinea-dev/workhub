@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createProject } from "../actions";
 import { FilterForm, LiveRefresh, SubmitButton } from "@/components/client";
 import { ProjectNameFields } from "@/components/project-name-fields";
-import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge } from "@/components/ui";
+import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, ProjectDot } from "@/components/ui";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import {
   filterAndSortProjects,
@@ -20,6 +20,7 @@ import { PROJECT_STATUSES, type ProjectStatus, type TaskStatus } from "@/lib/typ
 type Row = {
   id: string;
   name: string;
+  title: string | null;
   status: ProjectStatus;
   due_date: string | null;
   owner_id: string | null;
@@ -48,7 +49,7 @@ export default async function ProjectsPage({
 
   const query = supabase
     .from("projects")
-    .select("id, name, status, due_date, owner_id, company_id, project_type, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id)");
+    .select("id, name, title, status, due_date, owner_id, company_id, project_type, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id)");
 
   const [{ data }, people, companies, { data: templateData }, projectTypes, nextReference] = await Promise.all([
     query,
@@ -238,7 +239,15 @@ export default async function ProjectsPage({
                 return (
                   <tr key={p.id} className="hover:bg-stone-50">
                     <td className="table-cell">
-                      <Link href={`/projects/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
+                      <Link href={`/projects/${p.id}`} className="group inline-flex items-start gap-2">
+                        <span className="mt-1.5">
+                          <ProjectDot id={p.id} />
+                        </span>
+                        <span>
+                          <span className="font-medium group-hover:underline">{p.title || p.name}</span>
+                          {p.title && p.title !== p.name && <span className="block text-xs text-stone-500">{p.name}</span>}
+                        </span>
+                      </Link>
                     </td>
                     <td className="table-cell text-stone-600">{p.company?.name ?? "—"}</td>
                     <td className="table-cell text-stone-600">{nameOf(people, p.owner_id)}</td>

@@ -1,4 +1,5 @@
 import { Toast } from "@/components/client";
+import { projectColor } from "@/lib/colors";
 import type { Health } from "@/lib/milestones";
 import type { ProjectStatus, TaskStatus, TimesheetStatus } from "@/lib/types";
 import { PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
@@ -88,4 +89,14 @@ const TIMESHEET: Record<TimesheetStatus, { label: string; tone: string }> = {
 export function TimesheetBadge({ status }: { status: TimesheetStatus }) {
   const t = TIMESHEET[status];
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${t.tone}`}>{t.label}</span>;
+}
+
+export function ProjectDot({ id, size = "sm" }: { id: string; size?: "sm" | "lg" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block shrink-0 rounded ${size === "lg" ? "h-3.5 w-3.5" : "h-2.5 w-2.5"}`}
+      style={{ backgroundColor: projectColor(id) }}
+    />
+  );
 }
