@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { csvResponse } from "@/lib/csv";
-import { getPeople, nameOf } from "@/lib/data";
+import { getPeople, getTeams, nameOf } from "@/lib/data";
 import { todayISO } from "@/lib/dates";
 import { filterAndSortProjects, parseProjectFilters } from "@/lib/list-filters";
 import { nextMilestone } from "@/lib/milestones";
@@ -38,7 +38,9 @@ export async function GET(request: NextRequest) {
   const [{ data }, people] = await Promise.all([query, getPeople()]);
   const today = todayISO();
 
-  const rows = filterAndSortProjects((data ?? []) as unknown as Row[], f, today).map((p) => {
+  const teams = await getTeams();
+  const teamMembers = Object.fromEntries(teams.map((x) => [x.id, x.member_ids]));
+  const rows = filterAndSortProjects((data ?? []) as unknown as Row[], f, today, teamMembers).map((p) => {
     const next = nextMilestone(p.tasks, today);
     const hours = p.time_entries.reduce((s, t) => s + Number(t.hours), 0);
     const billable = p.time_entries.filter((t) => t.hour_type === "billable").reduce((s, t) => s + Number(t.hours), 0);

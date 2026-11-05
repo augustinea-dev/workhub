@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { takeRoleTask } from "./actions";
 import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
+import { QuickLogRow } from "@/components/quick-log-row";
 import { Empty, Flash, PageHeader } from "@/components/ui";
 import { addDays, formatDate, todayISO, weekStart } from "@/lib/dates";
 import { getJobRoles, sp } from "@/lib/data";
@@ -186,17 +187,18 @@ export default async function MyWorkPage({
                   {g.label} <span className="font-normal text-stone-400">· {g.items.length}</span>
                 </h2>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[520px]">
+                  <table className="w-full min-w-[620px]">
                     <thead>
                       <tr>
                         <th className="table-head">Task</th>
                         <th className="table-head w-28">Due</th>
                         <th className="table-head w-36">Status</th>
+                        <th className="table-head w-28"><span className="sr-only">Log time</span></th>
                       </tr>
                     </thead>
                     <tbody>
                       {g.items.map((t) => (
-                        <tr key={t.id} className="hover:bg-stone-50">
+                        <QuickLogRow key={t.id} taskId={t.id} title={t.title} today={today} columns={3}>
                           <td className="table-cell">
                             <Link href={`/tasks/${t.id}`} className="font-medium hover:underline">
                               {t.is_milestone && <span title="Milestone">◆ </span>}
@@ -214,7 +216,7 @@ export default async function MyWorkPage({
                           <td className="table-cell">
                             <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo="/" />
                           </td>
-                        </tr>
+                        </QuickLogRow>
                       ))}
                     </tbody>
                   </table>

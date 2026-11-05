@@ -12,7 +12,7 @@ import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
-import { getCompanies, getJobRoles, getPeople, getProjectTypes, nameOf, personOption, sp } from "@/lib/data";
+import { getCompanies, getJobRoles, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { PROJECT_STATUSES, TASK_STATUSES, type Project, type Task } from "@/lib/types";
@@ -37,7 +37,9 @@ export default async function ProjectPage({
     getPeople(),
     getCompanies(),
   ]);
-  const [projectTypes, jobRoles] = await Promise.all([getProjectTypes(), getJobRoles()]);
+  const [projectTypes, jobRoles, teams] = await Promise.all([getProjectTypes(), getJobRoles(), getTeams()]);
+  const activeTeams = teams.filter((x) => x.active);
+  const teamMembers = Object.fromEntries(teams.map((x) => [x.id, x.member_ids]));
   if (!project) notFound();
 
   const p = project as Project;
@@ -56,7 +58,7 @@ export default async function ProjectPage({
   const next = milestoneGroups.find((g) => g.milestone.status !== "done");
   const tf = parseTaskFilters(query);
   const tFiltered = hasTaskFilters(tf);
-  const matches = (t: Task) => taskMatches(t, tf, me.id, today);
+  const matches = (t: Task) => taskMatches(t, tf, me.id, today, teamMembers);
   const byColumn = compareTasks(tf, people);
   const kids = new Map<string, Task[]>();
   for (const t of list) if (t.parent_task_id) kids.set(t.parent_task_id, [...(kids.get(t.parent_task_id) ?? []), t]);
@@ -266,6 +268,13 @@ export default async function ProjectPage({
                       .map((x) => (
                         <option key={x.id} value={x.id}>{x.full_name}</option>
                       ))}
+                    {activeTeams.length > 0 && (
+                      <optgroup label="Teams">
+                        {activeTeams.map((x) => (
+                          <option key={x.id} value={`team:${x.id}`}>{x.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
                 <div>

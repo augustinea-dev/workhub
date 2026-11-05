@@ -158,12 +158,15 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 
 ## Logging time
 
+**Quick log on My Work:** every task row has a **Log time** button. It opens a small form under the row (date, hours, type, note) and logs it without leaving My Work. Dates in the future can't be picked there.
+
 **Where:** a task's Time section, or the Time page (for project-level time).
 
 - **Everyone:**
   - Log hours in 15-minute steps with a date, hour type (Billable, Non-billable, Admin, Meeting, PTO) and optional note.
   - Edit or remove your own entries, unless that week's timesheet is submitted or approved.
 - **Admins only:** edit or remove anyone's entries (same lock applies), and view anyone's week on the Time page.
+- **Team managers:** can view their team members' weeks on the Time page (pick them under Person).
 
 ## Timesheets
 
@@ -180,6 +183,7 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
   - **Approvals** (button on the Time page, with a count): every submitted week, with total and billable hours. **Review** opens the week; **Approve** from the list or the week.
   - **Return** a week with a note (required) so the person can fix it.
   - **Reopen** an approved week to allow changes. An Admin must reopen a week before changing its time.
+- **Team managers (Admins or Users):** the same Approvals, Return and Reopen for the members of teams they manage, never for their own week. Approvals shows only their team, with a Team filter if they manage more than one.
   - Set each person's **hours per week** on the Admin page (lower it for part-time staff).
 
 ## Exports (CSV)
@@ -192,11 +196,18 @@ Files open in Excel or Google Sheets.
   - **Your time:** **Export to CSV** at the bottom of the Time page. Pick a date range, up to a year. Each row has the date, client, project, task, hours, hour type, billable (yes/no), note and that week's timesheet status.
 - **Admins only:** in the time export, choose one person or **Everyone**.
 
+## Teams
+
+- **Everyone:** type **@** in an update and pick a team (for example "@Design team") to mention every member at once. The Assignee filter on a project's list and the Owner filter on the Projects list include teams.
+- **Team managers:** approve, return and reopen their members' timesheets (see Timesheets).
+- **Admins only:** create teams on the Admin page, set a manager (optional), add or remove members, and make a team inactive. Tasks can't be assigned to a whole team yet; use open roles for that.
+
 ## Inbox
 
 **Where:** Inbox in the sidebar (the badge shows unread).
 
 - **Everyone:** notices for tasks assigned to you, new updates on tasks you're involved in (an assignee, the project owner, or you've posted), mentions, and timesheet decisions. Opening one marks it read and takes you to the task or week. **Mark all read** clears the badge.
+- **Notification settings** (Inbox → Settings, or under your name in the sidebar): turn each kind of notice on or off. "Timesheet returned" is always on so a returned week isn't missed.
 
 ## Templates (Admins only)
 

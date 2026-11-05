@@ -5,6 +5,10 @@ import { addComment } from "@/app/(app)/actions";
 import { SubmitButton } from "@/components/client";
 
 export type MentionPerson = { id: string; name: string; email: string };
+/** A team that can be mentioned; mentioning it notifies every member. */
+export type MentionTeam = { id: string; name: string; memberIds: string[] };
+
+type Option = { kind: "person"; id: string; name: string; email: string } | ({ kind: "team" } & MentionTeam);
 
 const MAX_SUGGESTIONS = 6;
 
@@ -14,19 +18,32 @@ function activeQuery(text: string, caret: number): { start: number; query: strin
   return m ? { start: caret - m[2].length - 1, query: m[2].toLowerCase() } : null;
 }
 
-export function MentionComposer({ taskId, people }: { taskId: string; people: MentionPerson[] }) {
+export function MentionComposer({
+  taskId,
+  people,
+  teams = [],
+}: {
+  taskId: string;
+  people: MentionPerson[];
+  teams?: MentionTeam[];
+}) {
   const listId = useId();
   const ref = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState("");
-  const [picked, setPicked] = useState<MentionPerson[]>([]);
+  const [picked, setPicked] = useState<Option[]>([]);
   const [query, setQuery] = useState<{ start: number; query: string } | null>(null);
   const [active, setActive] = useState(0);
 
+  const options: Option[] = [
+    ...teams.map((t) => ({ kind: "team" as const, ...t })),
+    ...people.map((p) => ({ kind: "person" as const, ...p })),
+  ];
   const matches = query
-    ? people
-        .filter((p) => {
+    ? options
+        .filter((o) => {
           const q = query.query;
-          return !q || p.email.toLowerCase().startsWith(q) || p.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q));
+          const words = o.name.toLowerCase().split(/\s+/);
+          return !q || words.some((w) => w.startsWith(q)) || (o.kind === "person" && o.email.toLowerCase().startsWith(q));
         })
         .slice(0, MAX_SUGGESTIONS)
     : [];
@@ -38,7 +55,7 @@ export function MentionComposer({ taskId, people }: { taskId: string; people: Me
     setActive(0);
   }
 
-  function pick(p: MentionPerson) {
+  function pick(p: Option) {
     const el = ref.current;
     if (!el || !query) return;
     const caret = el.selectionStart;
@@ -47,7 +64,7 @@ export function MentionComposer({ taskId, people }: { taskId: string; people: Me
     const pos = query.start + insert.length;
     setText(next);
     setQuery(null);
-    setPicked((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
+    setPicked((prev) => (prev.some((x) => x.kind === p.kind && x.id === p.id) ? prev : [...prev, p]));
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(pos, pos);
@@ -57,11 +74,15 @@ export function MentionComposer({ taskId, people }: { taskId: string; people: Me
   return (
     <form action={addComment} className="space-y-2 p-4">
       <input type="hidden" name="task_id" value={taskId} />
-      {picked
-        .filter((p) => text.includes(`@${p.name}`))
-        .map((p) => (
-          <input key={p.id} type="hidden" name="mention" value={p.id} />
-        ))}
+      {[
+        ...new Set(
+          picked
+            .filter((p) => text.includes(`@${p.name}`))
+            .flatMap((p) => (p.kind === "team" ? p.memberIds : [p.id])),
+        ),
+      ].map((id) => (
+        <input key={id} type="hidden" name="mention" value={id} />
+      ))}
       <div className="relative">
         <textarea
           ref={ref}
@@ -106,7 +127,7 @@ export function MentionComposer({ taskId, people }: { taskId: string; people: Me
           >
             {matches.map((p, i) => (
               <li
-                key={p.id}
+                key={`${p.kind}-${p.id}`}
                 id={`${listId}-${i}`}
                 role="option"
                 aria-selected={i === active}
@@ -118,7 +139,9 @@ export function MentionComposer({ taskId, people }: { taskId: string; people: Me
                 className={`cursor-pointer px-3 py-2 ${i === active ? "bg-stone-100" : ""}`}
               >
                 <p className="text-sm font-medium text-stone-900">{p.name}</p>
-                <p className="text-xs text-stone-500">{p.email}</p>
+                <p className="text-xs text-stone-500">
+                  {p.kind === "team" ? `Team · ${p.memberIds.length} ${p.memberIds.length === 1 ? "person" : "people"}` : p.email}
+                </p>
               </li>
             ))}
           </ul>

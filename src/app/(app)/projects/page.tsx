@@ -12,7 +12,7 @@ import {
   type ProjectSort,
 } from "@/lib/list-filters";
 import { nextMilestone } from "@/lib/milestones";
-import { getCompanies, getNextReference, getPeople, getProjectTypes, nameOf, personOption, sp } from "@/lib/data";
+import { getCompanies, getNextReference, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { PROJECT_STATUSES, type ProjectStatus, type TaskStatus } from "@/lib/types";
@@ -63,7 +63,9 @@ export default async function ProjectsPage({
   const templates = templateData ?? [];
   const today = todayISO();
   const all = (data ?? []) as unknown as Row[];
-  const rows = filterAndSortProjects(all, f, today);
+  const teams = await getTeams();
+  const activeTeams = teams.filter((x) => x.active);
+  const rows = filterAndSortProjects(all, f, today, Object.fromEntries(teams.map((x) => [x.id, x.member_ids])));
   const filtered = hasProjectFilters(f);
   const owners = people.filter((p) => all.some((r) => r.owner_id === p.id));
   const sortHead = (key: ProjectSort, label: string) => {
@@ -177,6 +179,13 @@ export default async function ProjectsPage({
             {owners.map((p) => (
               <option key={p.id} value={p.id}>{p.id === me.id ? "You" : p.full_name}</option>
             ))}
+            {activeTeams.length > 0 && (
+                      <optgroup label="Teams">
+                        {activeTeams.map((x) => (
+                          <option key={x.id} value={`team:${x.id}`}>{x.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
           </select>
         </div>
         <div>

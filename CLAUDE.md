@@ -49,14 +49,17 @@ src/lib/                    supabase clients, session (requireProfile / requireA
 | Approve, return (with note) or reopen timesheets | ✓ | ✗ |
 | Set someone's hours per week | ✓ | ✗ (trigger `guard_profile_update`) |
 | Delete projects, tasks, comments, clients | ✓ | ✗ |
-| Admin page, audit log, other people's timesheets | ✓ | ✗ |
+| Admin page, audit log, other people's timesheets | ✓ | ✗ (team managers: their members' timesheets) |
+| Approve, return or reopen a team member's timesheet | ✓ | Team manager only, never their own |
+| Manage teams | ✓ | ✗ |
+| Notification settings | Own | Own ("timesheet returned" can't be turned off) |
 | Project templates (view, create, edit, delete, use, save project as template) | ✓ | ✗ |
 
 When adding a feature, decide its admin/member rule first. Enforce it with an RLS policy or trigger in a new migration, check it in the server action (`requireAdmin()` / `requireProfile()`), and hide controls the person can't use.
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
@@ -74,6 +77,8 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 - Project names are built by trigger `build_project_name` as `reference_number_billing year_name on project_title_project type` (e.g. `973623_2026_The Lanes_Website_TA`, matching the Workfront convention). New projects take `workhub_settings.next_reference_number`; Workfront imports keep their number and set `name_locked`. `src/lib/naming.ts` mirrors the rules for the live preview and must stay in step. Clients are the legal billing entity and hold `project_label` (brand) and `fiscal_year_start_month`. Project types (TA, TB, HC, Monthly, Initial) live in `project_types`.
 - Tasks can have several people: `task_assignees` (and `template_task_assignees`). There is no `tasks.assignee_id`. Select `task_assignees(profile_id)` and turn it into `assignee_ids` with `withAssignees()` in `src/lib/assignees.ts`; save with `syncAssignees()` in actions. Adding someone notifies them (`notify_task_assignee_added`).
 - Job roles: `job_roles`, `profile_job_roles` (one `is_main` per person). Open role slots on tasks are `task_role_slots` (repeats allowed), on templates `template_task_role_slots`. `take_role_task()` swaps a slot for the caller ("Work on it"), `assign_role_slot()` lets an admin fill it; both record `task_assignees.as_role_id`. Load slots with the `ASSIGNEES` embed (gives `open_roles`), save with `syncRoleSlots()`.
+- Teams: `teams` (optional `manager_id`) and `team_members`. `manages(profile)` is true for an active team's manager; it widens timesheet reads and lets `decide_timesheet` / `reopen_timesheet` act for managers (never on their own week). Filters accept `team:<id>`. Mentioning "@Team name" mentions every member.
+- Notification settings: `notification_preferences` rows turn a kind off; trigger `skip_muted_notification` drops those notices. `timesheet_returned` isn't an allowed kind there, so it's always on.
 - Subtasks: `tasks.parent_task_id`, same project, one level deep (trigger `check_task_parent`; relax it there to allow more levels). A parent's start, due and estimate are rolled up from its subtasks by `apply_subtask_rollup` / `refresh_parent_rollup`, per field, only when at least one subtask has that value. Admin-only to create, like all tasks.
 - Timesheets: one row per person per Monday week in `timesheets`, changed only through `submit_timesheet()`, `recall_timesheet()`, `decide_timesheet()` and `reopen_timesheet()` (no direct write policies). A week can't be submitted below the person's `profiles.weekly_hours` (PTO counts). Trigger `guard_locked_week` blocks time entry changes in submitted or approved weeks for everyone.
 - `docs/roles-guide.md` lists what Admins and Users can do, feature by feature, in plain language for the future onboarding doc. Update it whenever a feature lands or a permission changes.

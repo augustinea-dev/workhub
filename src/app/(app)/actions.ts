@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireProfile } from "@/lib/session";
-import { getPeople } from "@/lib/data";
+import { getPeople, getTeams } from "@/lib/data";
 import { isValidISODate } from "@/lib/dates";
-import { HOUR_TYPES, PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
+import { HOUR_TYPES, NOTIFICATION_KINDS, PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
 
 const CONFLICT =
   "Someone else changed this since you opened it. Their version is shown below — make your change again.";
@@ -185,6 +185,49 @@ export async function saveJobRole(fd: FormData) {
     : await supabase.from("job_roles").insert(row);
   if (error) fail("/admin", error.code === "23505" ? `${name} already exists.` : error.message);
   done("/admin", `Saved the ${name} role.`);
+}
+
+// ---------- teams (admin) ----------
+export async function saveTeam(fd: FormData) {
+  await requireAdmin();
+  const name = str(fd, "name");
+  if (!name) fail("/admin", "Give the team a name.");
+  const row = { name, manager_id: opt(fd, "manager_id"), active: str(fd, "active") === "on" };
+  const supabase = await createClient();
+  const existing = str(fd, "id");
+  const { data, error } = existing
+    ? await supabase.from("teams").update(row).eq("id", existing).select("id").single()
+    : await supabase.from("teams").insert(row).select("id").single();
+  if (error || !data) fail("/admin", error?.code === "23505" ? `${name} already exists.` : error?.message ?? "Couldn't save the team.");
+  const members = [...new Set(fd.getAll("member_ids").map(String).filter(Boolean))];
+  const { data: current } = await supabase.from("team_members").select("profile_id").eq("team_id", data.id);
+  const now = (current ?? []).map((m) => m.profile_id as string);
+  const gone = now.filter((x) => !members.includes(x));
+  const added = members.filter((x) => !now.includes(x));
+  if (gone.length) {
+    const { error: e } = await supabase.from("team_members").delete().eq("team_id", data.id).in("profile_id", gone);
+    if (e) fail("/admin", e.message);
+  }
+  if (added.length) {
+    const { error: e } = await supabase.from("team_members").insert(added.map((profile_id) => ({ team_id: data.id, profile_id })));
+    if (e) fail("/admin", e.message);
+  }
+  done("/admin", `Saved ${name}.`);
+}
+
+// ---------- notification settings ----------
+export async function saveNotificationSettings(fd: FormData) {
+  const me = await requireProfile();
+  const rows = NOTIFICATION_KINDS.filter((k) => !k.locked).map((k) => ({
+    profile_id: me.id,
+    kind: k.kind,
+    in_app: str(fd, k.kind) === "on",
+    updated_at: new Date().toISOString(),
+  }));
+  const supabase = await createClient();
+  const { error } = await supabase.from("notification_preferences").upsert(rows);
+  if (error) fail("/settings", error.message);
+  done("/settings", "Notification settings saved.");
 }
 
 // ---------- settings (admin) ----------
@@ -569,10 +612,13 @@ export async function addComment(fd: FormData) {
   const path = `/tasks/${taskId}`;
   const body = str(fd, "body");
   if (!body) fail(path, "Write a comment first.");
-  const people = await getPeople();
+  const [people, teams] = await Promise.all([getPeople(), getTeams()]);
+  const mentionedTeams = teams.filter((t) => t.active && body.includes(`@${t.name}`));
   const mentions = [...new Set(fd.getAll("mention").map(String))].filter((id) => {
     const p = people.find((x) => x.id === id);
-    return p && p.active && p.id !== me.id && body.includes(`@${p.full_name}`);
+    const named = p && body.includes(`@${p.full_name}`);
+    const viaTeam = mentionedTeams.some((t) => t.member_ids.includes(id));
+    return p && p.active && p.id !== me.id && (named || viaTeam);
   });
   const supabase = await createClient();
   const { error } = await supabase.from("comments").insert({ task_id: taskId, body, author_id: me.id, mentions });
@@ -673,7 +719,7 @@ export async function recallTimesheet(fd: FormData) {
 }
 
 export async function decideTimesheet(fd: FormData) {
-  await requireAdmin();
+  await requireProfile();
   const back = safePath(str(fd, "redirect_to"), "/time/approvals");
   const approve = str(fd, "decision") === "approve";
   const supabase = await createClient();
@@ -687,7 +733,7 @@ export async function decideTimesheet(fd: FormData) {
 }
 
 export async function reopenTimesheet(fd: FormData) {
-  await requireAdmin();
+  await requireProfile();
   const back = safePath(str(fd, "redirect_to"), "/time/approvals");
   const supabase = await createClient();
   const { error } = await supabase.rpc("reopen_timesheet", { p_id: str(fd, "id") });

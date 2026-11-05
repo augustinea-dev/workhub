@@ -9,7 +9,7 @@ import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, HealthBadge, TaskBadge } from "@/components/ui";
 import { assigneeLabel, openRoleNames, pickerOptions, roleIdsOf, withAssignees } from "@/lib/assignees";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
-import { getJobRoles, getPeople, nameOf, sp } from "@/lib/data";
+import { getJobRoles, getPeople, getTeams, nameOf, sp } from "@/lib/data";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
 import { requireProfile } from "@/lib/session";
@@ -100,7 +100,7 @@ export default async function TaskPage({
   const isAdmin = me.role === "admin";
   const supabase = await createClient();
 
-  const [{ data: task }, { data: comments }, { data: time }, { data: children }, people, jobRoles] = await Promise.all([
+  const [{ data: task }, { data: comments }, { data: time }, { data: children }, people, jobRoles, teams] = await Promise.all([
     supabase
       .from("tasks")
       .select(
@@ -117,6 +117,7 @@ export default async function TaskPage({
       .order("sort_order"),
     getPeople(),
     getJobRoles(),
+    getTeams(),
     // Opening a task counts as reading its notifications.
     supabase
       .from("notification_events")
@@ -453,7 +454,10 @@ export default async function TaskPage({
                     <p className="mt-1 whitespace-pre-wrap text-sm text-stone-800">
                       {withMentions(
                         c.body,
-                        (c.mentions ?? []).map((m) => people.find((x) => x.id === m)?.full_name).filter((n): n is string => !!n),
+                        [
+                          ...(c.mentions ?? []).map((m) => people.find((x) => x.id === m)?.full_name).filter((n): n is string => !!n),
+                          ...teams.filter((x) => c.body.includes(`@${x.name}`)).map((x) => x.name),
+                        ],
                         me.full_name,
                       )}
                     </p>
@@ -467,6 +471,7 @@ export default async function TaskPage({
               people={people
                 .filter((x) => x.active && x.id !== me.id)
                 .map((x) => ({ id: x.id, name: x.full_name, email: x.email }))}
+              teams={teams.filter((x) => x.active && x.member_ids.length).map((x) => ({ id: x.id, name: x.name, memberIds: x.member_ids }))}
             />
           </section>
 

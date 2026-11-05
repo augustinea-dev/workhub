@@ -161,3 +161,14 @@ export type Timesheet = {
   decided_by: string | null;
   return_note: string | null;
 };
+
+export type Team = { id: string; name: string; manager_id: string | null; active: boolean; member_ids: string[] };
+
+export const NOTIFICATION_KINDS: { kind: string; label: string; help: string; locked?: boolean }[] = [
+  { kind: "task_assigned", label: "Assigned to a task", help: "Someone adds you to a task." },
+  { kind: "task_comment", label: "New updates", help: "Someone posts on a task you're on, own, or have posted on." },
+  { kind: "mention", label: "@Mentions", help: "Someone mentions you, or a team you're in, in an update." },
+  { kind: "timesheet_approved", label: "Timesheet approved", help: "Your submitted week is approved." },
+  { kind: "timesheet_reopened", label: "Timesheet reopened", help: "An approved week is reopened for changes." },
+  { kind: "timesheet_returned", label: "Timesheet returned", help: "Your week is sent back with a note. Always on, so it isn't missed.", locked: true },
+];

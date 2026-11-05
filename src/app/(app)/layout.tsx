@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Image from "next/image";
 import { NavLink } from "@/components/client";
 import { requireProfile } from "@/lib/session";
@@ -39,6 +40,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="hidden border-t border-stone-200 px-4 py-4 md:absolute md:bottom-0 md:block md:w-56">
           <p className="truncate text-sm font-medium">{me.full_name}</p>
           <p className="truncate text-xs text-stone-500">{me.email}</p>
+          <Link href="/settings" className="mt-2 block text-xs font-medium text-stone-600 hover:text-stone-900">
+            Notification settings
+          </Link>
           <form action="/auth/signout" method="post" className="mt-2">
             <button className="text-xs font-medium text-stone-600 hover:text-stone-900">Sign out</button>
           </form>

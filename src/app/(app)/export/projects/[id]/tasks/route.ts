@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ASSIGNEES, assigneeLabel, openRoleNames, withAssignees } from "@/lib/assignees";
 import { csvResponse, slug } from "@/lib/csv";
-import { getJobRoles, getPeople } from "@/lib/data";
+import { getJobRoles, getPeople, getTeams } from "@/lib/data";
 import { formatTimestamp, todayISO } from "@/lib/dates";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskMatches } from "@/lib/list-filters";
 import { requireProfile } from "@/lib/session";
@@ -19,7 +19,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     supabase.from("time_entries").select("task_id, hours").eq("project_id", id),
     getPeople(),
   ]);
-  const jobRoles = await getJobRoles();
+  const [jobRoles, teams] = await Promise.all([getJobRoles(), getTeams()]);
+  const teamMembers = Object.fromEntries(teams.map((x) => [x.id, x.member_ids]));
   if (!project) return new Response("Project not found.", { status: 404 });
 
   const all = ((tasks ?? []) as (Omit<Task, "assignee_ids" | "open_roles"> & { task_assignees: { profile_id: string }[] })[]).map(
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const title = new Map(all.map((t) => [t.id, t.title]));
   const today = todayISO();
   const customised = hasTaskFilters(tf) || tf.sort !== "due" || tf.dir !== "asc";
-  const list = customised ? all.filter((t) => taskMatches(t, tf, me.id, today)).sort(compareTasks(tf, people)) : all;
+  const list = customised ? all.filter((t) => taskMatches(t, tf, me.id, today, teamMembers)).sort(compareTasks(tf, people)) : all;
   const logged = new Map<string, number>();
   for (const e of time ?? []) {
     if (e.task_id) logged.set(e.task_id, (logged.get(e.task_id) ?? 0) + Number(e.hours));

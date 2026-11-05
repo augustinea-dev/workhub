@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { decideTimesheet } from "../../actions";
-import { LiveRefresh, SubmitButton } from "@/components/client";
+import { FilterForm, LiveRefresh, SubmitButton } from "@/components/client";
 import { Empty, Flash, PageHeader, TimesheetBadge } from "@/components/ui";
 import { addDays, formatDate, formatTimestamp } from "@/lib/dates";
-import { getPeople, nameOf, sp } from "@/lib/data";
-import { requireAdmin } from "@/lib/session";
+import { getPeople, getTeams, managedIds, nameOf, sp } from "@/lib/data";
+import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import type { Timesheet } from "@/lib/types";
 
@@ -14,7 +15,16 @@ export default async function ApprovalsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  await requireAdmin();
+  const me = await requireProfile();
+  const isAdmin = me.role === "admin";
+  const teams = await getTeams();
+  const managed = managedIds(teams, me.id);
+  if (!isAdmin && !managed.length) redirect("/time");
+  const teamFilter = sp(params.team) ?? "";
+  const team = teams.find((t) => t.id === teamFilter);
+  // Managers see their team's weeks (never their own); admins see everyone, optionally one team.
+  const inScope = (userId: string) =>
+    (isAdmin ? true : managed.includes(userId)) && (!team || team.member_ids.includes(userId));
   const supabase = await createClient();
   const [{ data: waitingData }, { data: recentData }, people] = await Promise.all([
     supabase.from("timesheets").select("*").eq("status", "submitted").order("week_start").order("submitted_at"),
@@ -26,8 +36,8 @@ export default async function ApprovalsPage({
       .limit(20),
     getPeople(),
   ]);
-  const waiting = (waitingData ?? []) as Timesheet[];
-  const recent = (recentData ?? []) as Timesheet[];
+  const waiting = ((waitingData ?? []) as Timesheet[]).filter((t) => inScope(t.user_id));
+  const recent = ((recentData ?? []) as Timesheet[]).filter((t) => inScope(t.user_id));
   const ids = [...new Set(waiting.map((t) => t.user_id))];
   const weeks = waiting.map((t) => t.week_start);
   const { data: hoursData } = ids.length
@@ -51,7 +61,24 @@ export default async function ApprovalsPage({
       <p className="mb-2 text-sm text-stone-500">
         <Link href="/time" className="hover:underline">Time</Link>
       </p>
-      <PageHeader title="Approvals" subtitle={`${waiting.length} timesheet${waiting.length === 1 ? "" : "s"} waiting`} />
+      <PageHeader
+        title="Approvals"
+        subtitle={`${waiting.length} timesheet${waiting.length === 1 ? "" : "s"} waiting${isAdmin ? "" : " from your team"}`}
+      >
+        {teams.some((t) => t.active) && (
+          <FilterForm key={teamFilter} className="flex items-center gap-2">
+            <label htmlFor="approvals_team" className="text-xs font-medium uppercase tracking-wide text-stone-500">Team</label>
+            <select id="approvals_team" name="team" defaultValue={teamFilter} className="input w-56">
+              <option value="">{isAdmin ? "Everyone" : "All my teams"}</option>
+              {teams
+                .filter((t) => t.active && (isAdmin || t.manager_id === me.id))
+                .map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+            </select>
+          </FilterForm>
+        )}
+      </PageHeader>
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
       <section className="card mb-6 overflow-x-auto">

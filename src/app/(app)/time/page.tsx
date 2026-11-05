@@ -4,7 +4,7 @@ import { FilterForm, SubmitButton } from "@/components/client";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, PageHeader, TimesheetBadge } from "@/components/ui";
 import { addDays, formatDate, formatDay, formatTimestamp, isValidISODate, todayISO, weekStart } from "@/lib/dates";
-import { getPeople, getProjectOptions, nameOf, personOption, sp } from "@/lib/data";
+import { getPeople, getProjectOptions, getTeams, managedIds, nameOf, personOption, sp } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { HOUR_TYPES, type HourType, type Timesheet } from "@/lib/types";
@@ -28,14 +28,18 @@ export default async function TimePage({
   const params = await searchParams;
   const me = await requireProfile();
   const isAdmin = me.role === "admin";
-  const people = await getPeople();
+  const [people, teams] = await Promise.all([getPeople(), getTeams()]);
+  const managed = managedIds(teams, me.id);
+  const reviewer = isAdmin || managed.length > 0;
 
   const requestedWeek = sp(params.week);
   const monday = weekStart(requestedWeek && isValidISODate(requestedWeek) ? requestedWeek : todayISO());
   const sunday = addDays(monday, 6);
-  // Admins can look at anyone's week; members see their own.
+  // Admins can look at anyone's week, team managers at their team's; everyone else sees their own.
   const requestedUser = sp(params.user);
-  const userId = isAdmin && requestedUser && people.some((p) => p.id === requestedUser) ? requestedUser : me.id;
+  const canView = (id: string) => isAdmin || id === me.id || managed.includes(id);
+  const userId = requestedUser && people.some((p) => p.id === requestedUser) && canView(requestedUser) ? requestedUser : me.id;
+  const viewable = isAdmin ? people : people.filter((p) => p.id === me.id || managed.includes(p.id));
 
   const supabase = await createClient();
   const [{ data }, projects, { data: sheet }, { count: waiting }] = await Promise.all([
@@ -51,12 +55,15 @@ export default async function TimePage({
     supabase.from("timesheets").select("*").eq("user_id", userId).eq("week_start", monday).maybeSingle(),
     isAdmin
       ? supabase.from("timesheets").select("id", { count: "exact", head: true }).eq("status", "submitted")
-      : Promise.resolve({ count: 0 }),
+      : managed.length
+        ? supabase.from("timesheets").select("id", { count: "exact", head: true }).eq("status", "submitted").in("user_id", managed)
+        : Promise.resolve({ count: 0 }),
   ]);
   const ts = sheet as Timesheet | null;
   const status = ts?.status ?? "open";
   const locked = status === "submitted" || status === "approved";
   const isOwn = userId === me.id;
+  const canDecide = isAdmin || (managed.includes(userId) && !isOwn);
   const expected = Number(people.find((p) => p.id === userId)?.weekly_hours ?? 40);
   const notStarted = monday > weekStart(todayISO());
   const rows = (data ?? []) as unknown as Row[];
@@ -74,7 +81,7 @@ export default async function TimePage({
   return (
     <>
       <PageHeader title="Time" subtitle={userId === me.id ? "Your hours, week by week" : `Viewing ${nameOf(people, userId)}'s hours`}>
-        {isAdmin && (
+        {reviewer && (
           <Link href="/time/approvals" className="btn">
             Approvals
             {!!waiting && <span className="ml-2 rounded-full bg-blue-700 px-2 text-xs font-semibold text-white">{waiting}</span>}
@@ -94,12 +101,12 @@ export default async function TimePage({
             </Link>
           )}
         </nav>
-        {isAdmin && (
+        {reviewer && (
           <FilterForm key={userId} className="flex items-center gap-2">
             <input type="hidden" name="week" value={monday} />
             <label htmlFor="time_person" className="text-xs font-medium uppercase tracking-wide text-stone-500">Person</label>
             <select id="time_person" name="user" defaultValue={userId} className="input w-72">
-              {people.map((p) => (
+              {viewable.map((p) => (
                 <option key={p.id} value={p.id}>{personOption(p)}</option>
               ))}
             </select>
@@ -147,7 +154,7 @@ export default async function TimePage({
               <SubmitButton className="btn" pendingText="Recalling…">Recall to edit</SubmitButton>
             </form>
           )}
-          {isAdmin && status === "submitted" && ts && (
+          {canDecide && status === "submitted" && ts && (
             <>
               <form action={decideTimesheet}>
                 <input type="hidden" name="id" value={ts.id} />
@@ -164,7 +171,7 @@ export default async function TimePage({
               </form>
             </>
           )}
-          {isAdmin && status === "approved" && ts && (
+          {canDecide && status === "approved" && ts && (
             <form action={reopenTimesheet}>
               <input type="hidden" name="id" value={ts.id} />
               <input type="hidden" name="redirect_to" value={here} />

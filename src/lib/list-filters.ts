@@ -86,14 +86,22 @@ type ProjectLike = {
   tasks: { id: string; title: string; status: TaskStatus; due_date: string | null; is_milestone: boolean; milestone_id: string | null }[];
 };
 
-export function filterAndSortProjects<T extends ProjectLike>(rows: T[], f: ProjectFilters, today: string): T[] {
+/** Team id to member ids, for "team:<id>" filter values. */
+export type TeamMembers = Record<string, string[]>;
+
+function inTeam(value: string, id: string | null | undefined, teams: TeamMembers): boolean {
+  return !!id && (teams[value.slice(5)] ?? []).includes(id);
+}
+
+export function filterAndSortProjects<T extends ProjectLike>(rows: T[], f: ProjectFilters, today: string, teams: TeamMembers = {}): T[] {
   const q = f.q.toLowerCase();
   const kept = rows.filter(
     (p) =>
       (f.status === "all" ||
         (f.status === "open" ? p.status !== "complete" && p.status !== "cancelled" : p.status === f.status)) &&
       (!f.client || (f.client === "none" ? !p.company_id : p.company_id === f.client)) &&
-      (!f.owner || (f.owner === "none" ? !p.owner_id : p.owner_id === f.owner)) &&
+      (!f.owner ||
+        (f.owner === "none" ? !p.owner_id : f.owner.startsWith("team:") ? inTeam(f.owner, p.owner_id, teams) : p.owner_id === f.owner)) &&
       (!f.type || (f.type === "none" ? !p.project_type : p.project_type === f.type)) &&
       (!q || p.name.toLowerCase().includes(q) || !!p.company?.name.toLowerCase().includes(q)),
   );
@@ -150,14 +158,16 @@ export function hasTaskFilters(f: TaskFilters): boolean {
 
 type TaskLike = { status: TaskStatus; due_date: string | null; assignee_ids: string[] };
 
-export function taskMatches(t: TaskLike, f: TaskFilters, meId: string, today: string): boolean {
+export function taskMatches(t: TaskLike, f: TaskFilters, meId: string, today: string, teams: TeamMembers = {}): boolean {
   return (
     (!f.assignee ||
       (f.assignee === "me"
         ? t.assignee_ids.includes(meId)
         : f.assignee === "none"
           ? t.assignee_ids.length === 0
-          : t.assignee_ids.includes(f.assignee))) &&
+          : f.assignee.startsWith("team:")
+            ? t.assignee_ids.some((id) => inTeam(f.assignee, id, teams))
+            : t.assignee_ids.includes(f.assignee))) &&
     (!f.status || t.status === f.status) &&
     (!f.overdue || (!!t.due_date && t.due_date < today && t.status !== "done"))
   );

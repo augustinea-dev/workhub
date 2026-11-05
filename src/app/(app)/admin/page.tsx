@@ -1,8 +1,10 @@
-import { saveJobRole, saveProjectType, updateMember, updateNextReference } from "../actions";
+import { saveJobRole, saveProjectType, saveTeam, updateMember, updateNextReference } from "../actions";
 import { SubmitButton } from "@/components/client";
 import { Flash, PageHeader } from "@/components/ui";
 import { formatTimestamp } from "@/lib/dates";
-import { getJobRoles, getNextReference, getPeople, getProjectTypes, nameOf, sp } from "@/lib/data";
+import { getJobRoles, getNextReference, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
+import { AssigneePicker } from "@/components/assignee-picker";
+import { pickerOptions } from "@/lib/assignees";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,6 +31,7 @@ export default async function AdminPage({
     getNextReference(),
     getJobRoles(),
   ]);
+  const teams = await getTeams();
   const roleName = (id: string) => jobRoles.find((r) => r.id === id)?.name ?? "Role";
   const supabase = await createClient();
   const { data: audit } = await supabase
@@ -116,6 +119,56 @@ export default async function AdminPage({
           part-time staff). To add someone: Supabase dashboard → Authentication → Users → <strong>Invite user</strong>. They appear here
           after they accept, as a User.
         </p>
+      </section>
+
+      <section className="card mb-6">
+        <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">Teams</h2>
+        <p className="px-4 pt-3 text-xs text-stone-500">
+          Group people into teams. A team&apos;s manager can approve, return and reopen their members&apos; timesheets
+          (never their own), and anyone can @mention a team in an update.
+        </p>
+        <div className="divide-y divide-stone-100">
+          {[...teams, null].map((t) => (
+            <form
+              key={t?.id ?? "new"}
+              action={saveTeam}
+              className="grid items-end gap-2 px-4 py-4 md:grid-cols-[12rem_14rem_minmax(0,1fr)_auto_auto]"
+            >
+              {t && <input type="hidden" name="id" value={t.id} />}
+              <div>
+                <label className="label" htmlFor={`team_name_${t?.id ?? "new"}`}>{t ? "Team" : "New team"}</label>
+                <input
+                  id={`team_name_${t?.id ?? "new"}`}
+                  name="name"
+                  required
+                  defaultValue={t?.name ?? ""}
+                  placeholder="Design team"
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor={`team_mgr_${t?.id ?? "new"}`}>Manager</label>
+                <select id={`team_mgr_${t?.id ?? "new"}`} name="manager_id" defaultValue={t?.manager_id ?? ""} className="input w-full">
+                  <option value="">No manager</option>
+                  {people.filter((p) => p.active || p.id === t?.manager_id).map((p) => (
+                    <option key={p.id} value={p.id}>{personOption(p)}</option>
+                  ))}
+                </select>
+              </div>
+              <AssigneePicker
+                key={t ? `${t.id}-${t.member_ids.join()}` : "new"}
+                {...pickerOptions(people, t?.member_ids)}
+                defaultValue={t?.member_ids ?? []}
+                name="member_ids"
+                label="Members"
+              />
+              <label className="flex items-center gap-1 pb-2 text-sm">
+                <input type="checkbox" name="active" value="on" defaultChecked={t ? t.active : true} /> Active
+              </label>
+              <SubmitButton className={t ? "btn" : "btn-primary"} pendingText="Saving…">{t ? "Save" : "Add team"}</SubmitButton>
+            </form>
+          ))}
+        </div>
       </section>
 
       <section className="card mb-6 overflow-x-auto">

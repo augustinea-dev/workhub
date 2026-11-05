@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { Company, JobRole, Profile, ProjectType } from "@/lib/types";
+import type { Company, JobRole, Profile, ProjectType, Team } from "@/lib/types";
 
 export const getPeople = cache(async (): Promise<Profile[]> => {
   const supabase = await createClient();
@@ -16,6 +16,22 @@ export const getCompanies = cache(async (): Promise<Company[]> => {
   const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month").order("name");
   return (data ?? []) as Company[];
 });
+
+export const getTeams = cache(async (): Promise<Team[]> => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("teams").select("id, name, manager_id, active, team_members(profile_id)").order("name");
+  return (data ?? []).map(({ team_members, ...t }) => ({
+    ...t,
+    member_ids: ((team_members ?? []) as { profile_id: string }[]).map((m) => m.profile_id),
+  })) as Team[];
+});
+
+/** People in active teams this person manages (not including themselves). */
+export function managedIds(teams: Team[], meId: string): string[] {
+  return [...new Set(teams.filter((t) => t.active && t.manager_id === meId).flatMap((t) => t.member_ids))].filter(
+    (id) => id !== meId,
+  );
+}
 
 export const getJobRoles = cache(async (): Promise<JobRole[]> => {
   const supabase = await createClient();
