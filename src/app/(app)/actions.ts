@@ -177,7 +177,7 @@ export async function saveJobRole(fd: FormData) {
   await requireAdmin();
   const name = str(fd, "name");
   if (!name) fail("/admin", "Give the role a name.");
-  const row = { name, active: str(fd, "active") === "on", sort_order: Number.parseInt(str(fd, "sort_order"), 10) || 0 };
+  const row = { name, active: str(fd, "active") === "on" };
   const supabase = await createClient();
   const id = str(fd, "id");
   const { error } = id
@@ -257,7 +257,6 @@ export async function saveProjectType(fd: FormData) {
     label,
     description: opt(fd, "description"),
     active: str(fd, "active") === "on",
-    sort_order: Number.parseInt(str(fd, "sort_order"), 10) || 0,
   };
   const supabase = await createClient();
   const { error } = existing

@@ -33,6 +33,7 @@ export default async function AdminPage({
   ]);
   const teams = await getTeams();
   const roleName = (id: string) => jobRoles.find((r) => r.id === id)?.name ?? "Role";
+  const holders = (roleId: string) => people.filter((p) => p.job_roles?.some((x) => x.role_id === roleId)).length;
   const supabase = await createClient();
   const { data: audit } = await supabase
     .from("audit_log")
@@ -182,12 +183,11 @@ export default async function AdminPage({
             <form key={r.id} action={saveJobRole} className="flex flex-wrap items-center gap-2">
               <input type="hidden" name="id" value={r.id} />
               <input name="name" required defaultValue={r.name} aria-label={`Name for ${r.name}`} className="input w-56 py-1.5" />
-              <input name="sort_order" type="number" defaultValue={r.sort_order} aria-label={`Order for ${r.name}`} className="input w-20 py-1.5" />
               <label className="flex items-center gap-1 text-sm">
                 <input type="checkbox" name="active" value="on" defaultChecked={r.active} /> Active
               </label>
               <span className="text-xs text-stone-400">
-                {people.filter((p) => p.job_roles?.some((x) => x.role_id === r.id)).length} people
+                {holders(r.id)} {holders(r.id) === 1 ? "person" : "people"}
               </span>
               <SubmitButton className="btn py-1.5">Save</SubmitButton>
             </form>
@@ -195,7 +195,6 @@ export default async function AdminPage({
           <form action={saveJobRole} className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
             <input type="hidden" name="active" value="on" />
             <input name="name" required placeholder="New role, e.g. Producer" aria-label="New role name" className="input w-56 py-1.5" />
-            <input name="sort_order" type="number" defaultValue={jobRoles.length + 1} aria-label="New role order" className="input w-20 py-1.5" />
             <SubmitButton className="btn py-1.5" pendingText="Adding…">Add role</SubmitButton>
           </form>
         </div>
@@ -239,7 +238,6 @@ export default async function AdminPage({
                   aria-label={`Description for ${t.code}`}
                   className="input min-w-56 flex-1 py-1.5"
                 />
-                <input name="sort_order" type="number" defaultValue={t.sort_order} aria-label={`Order for ${t.code}`} className="input w-20 py-1.5" />
                 <label className="flex items-center gap-1 text-sm">
                   <input type="checkbox" name="active" value="on" defaultChecked={t.active} /> Active
                 </label>
@@ -251,7 +249,6 @@ export default async function AdminPage({
               <input name="code" required placeholder="Code" aria-label="New type code" className="input w-20 py-1.5 font-mono" />
               <input name="label" placeholder="Label" aria-label="New type label" className="input w-40 py-1.5" />
               <input name="description" placeholder="What it's for" aria-label="New type description" className="input min-w-56 flex-1 py-1.5" />
-              <input name="sort_order" type="number" defaultValue={projectTypes.length + 1} aria-label="New type order" className="input w-20 py-1.5" />
               <SubmitButton className="btn py-1.5" pendingText="Adding…">Add type</SubmitButton>
             </form>
           </div>

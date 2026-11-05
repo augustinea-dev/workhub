@@ -35,13 +35,13 @@ export function managedIds(teams: Team[], meId: string): string[] {
 
 export const getJobRoles = cache(async (): Promise<JobRole[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.from("job_roles").select("*").order("sort_order").order("name");
+  const { data } = await supabase.from("job_roles").select("*").order("name");
   return (data ?? []) as JobRole[];
 });
 
 export const getProjectTypes = cache(async (): Promise<ProjectType[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.from("project_types").select("*").order("sort_order").order("code");
+  const { data } = await supabase.from("project_types").select("*").order("code");
   return (data ?? []) as ProjectType[];
 });
 
