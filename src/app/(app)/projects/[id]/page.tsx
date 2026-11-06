@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createTask, deleteProject, saveProjectAsTemplate, updateProject } from "../../actions";
+import { createTask, deleteProject, makeDropboxFolder, saveProjectAsTemplate, updateProject } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
 import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { Board, type BoardCard } from "@/components/board";
@@ -9,6 +9,7 @@ import { ProjectNameFields } from "@/components/project-name-fields";
 import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, ProjectDot, TaskBadge } from "@/components/ui";
 import { ASSIGNEES, assigneeLabel, openRoleNames, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
+import { dropboxStatus } from "@/lib/dropbox";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
 import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
@@ -37,7 +38,12 @@ export default async function ProjectPage({
     getPeople(),
     getCompanies(),
   ]);
-  const [projectTypes, jobRoles, teams] = await Promise.all([getProjectTypes(), getJobRoles(), getTeams()]);
+  const [projectTypes, jobRoles, teams, dropbox] = await Promise.all([
+    getProjectTypes(),
+    getJobRoles(),
+    getTeams(),
+    isAdmin ? dropboxStatus() : null,
+  ]);
   const activeTeams = teams.filter((x) => x.active);
   const teamMembers = Object.fromEntries(teams.map((x) => [x.id, x.member_ids]));
   if (!project) notFound();
@@ -550,6 +556,11 @@ export default async function ProjectPage({
                 <dd>
                   {p.dropbox_url ? (
                     <a href={p.dropbox_url} target="_blank" rel="noopener noreferrer" className="link">Open in Dropbox</a>
+                  ) : dropbox?.state === "connected" ? (
+                    <form action={makeDropboxFolder}>
+                      <input type="hidden" name="id" value={p.id} />
+                      <SubmitButton className="btn px-2.5 py-1 text-xs" pendingText="Creating…">Create Dropbox folder</SubmitButton>
+                    </form>
                   ) : (
                     <span className="text-stone-500">Not linked yet</span>
                   )}

@@ -1,7 +1,8 @@
-import { saveJobRole, saveProjectType, saveTeam, updateMember, updateNextReference } from "../actions";
+import { connectDropbox, disconnectDropbox, saveJobRole, saveProjectType, saveTeam, updateMember, updateNextReference } from "../actions";
 import { SubmitButton } from "@/components/client";
 import { Flash, PageHeader } from "@/components/ui";
 import { formatTimestamp } from "@/lib/dates";
+import { dropboxStatus } from "@/lib/dropbox";
 import { getJobRoles, getNextReference, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
 import { AssigneePicker } from "@/components/assignee-picker";
 import { pickerOptions } from "@/lib/assignees";
@@ -25,11 +26,12 @@ export default async function AdminPage({
 }) {
   const params = await searchParams;
   const me = await requireAdmin();
-  const [people, projectTypes, nextReference, jobRoles] = await Promise.all([
+  const [people, projectTypes, nextReference, jobRoles, dropbox] = await Promise.all([
     getPeople(),
     getProjectTypes(),
     getNextReference(),
     getJobRoles(),
+    dropboxStatus(),
   ]);
   const teams = await getTeams();
   const roleName = (id: string) => jobRoles.find((r) => r.id === id)?.name ?? "Role";
@@ -252,6 +254,48 @@ export default async function AdminPage({
               <SubmitButton className="btn py-1.5" pendingText="Adding…">Add type</SubmitButton>
             </form>
           </div>
+        </div>
+      </section>
+
+      <section id="dropbox" className="card mb-6">
+        <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">Dropbox</h2>
+        <div className="space-y-3 px-4 py-4 text-sm">
+          {dropbox.state === "missing_setup" && (
+            <p className="text-stone-600">
+              Add {dropbox.missing.map((m, i) => (
+                <span key={m}>
+                  {i > 0 && (i === dropbox.missing.length - 1 ? " and " : ", ")}
+                  <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">{m}</code>
+                </span>
+              ))}{" "}
+              to the server settings, then restart Workhub.
+            </p>
+          )}
+          {dropbox.state === "disconnected" && (
+            <>
+              <p className="text-stone-600">
+                Connect Dropbox so new projects get a folder (client, then project name) and its link automatically.
+              </p>
+              <form action={connectDropbox}>
+                <SubmitButton pendingText="Opening Dropbox…">Connect Dropbox</SubmitButton>
+              </form>
+            </>
+          )}
+          {dropbox.state === "connected" && (
+            <>
+              <p>
+                Connected as <span className="font-medium">{dropbox.account_name}</span>
+                {dropbox.account_email && <span className="text-stone-500"> ({dropbox.account_email})</span>}
+                <span className="text-stone-500"> since {formatTimestamp(dropbox.connected_at)}</span>
+              </p>
+              <p className="text-xs text-stone-500">
+                New projects get a folder automatically. Projects without one show a Create Dropbox folder button.
+              </p>
+              <form action={disconnectDropbox}>
+                <SubmitButton className="btn" pendingText="Disconnecting…">Disconnect</SubmitButton>
+              </form>
+            </>
+          )}
         </div>
       </section>
 

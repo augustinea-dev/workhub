@@ -1,11 +1,15 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireProfile } from "@/lib/session";
 import { getPeople, getTeams } from "@/lib/data";
 import { isValidISODate } from "@/lib/dates";
+import { authorizeUrl, createProjectFolder, dropboxStatus, removeConnection } from "@/lib/dropbox";
+import { dropboxRedirectUri } from "@/lib/dropbox-redirect";
 import { HOUR_TYPES, NOTIFICATION_KINDS, PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
 
 const CONFLICT =
@@ -306,6 +310,8 @@ export async function createProject(fd: FormData) {
     .select("id")
     .single();
   if (error || !data) fail("/projects", error?.message ?? "Couldn't create the project.");
+  const folderError = dropbox_url ? null : await linkDropboxFolder(data.id);
+  if (folderError) fail(`/projects/${data.id}`, `Project created, but the Dropbox folder couldn't be made: ${folderError}`);
   done(`/projects/${data.id}`, "Project created.");
 }
 
@@ -326,6 +332,8 @@ async function createProjectFromTemplate(fd: FormData, ownerFallback: string) {
   if (error || !data) fail("/projects", error?.message ?? "Couldn't create the project.");
   const { error: namingError } = await supabase.from("projects").update({ ...naming, dropbox_url }).eq("id", data);
   if (namingError) fail(`/projects/${data}`, `Project created, but its name couldn't be set: ${namingError.message}`);
+  const folderError = dropbox_url ? null : await linkDropboxFolder(data);
+  if (folderError) fail(`/projects/${data}`, `Project created, but the Dropbox folder couldn't be made: ${folderError}`);
   done(`/projects/${data}`, "Project created from the template.");
 }
 
@@ -374,6 +382,54 @@ export async function updateProject(fd: FormData) {
   if (error) fail(path, error.code === "23505" ? "That reference number is already used by another project." : error.message);
   if (!data?.length) fail(path, CONFLICT);
   done(path, "Project saved.");
+}
+
+/** Makes the project's Dropbox folder and saves its link. Returns an error message, or null when done or Dropbox isn't connected. */
+async function linkDropboxFolder(projectId: string): Promise<string | null> {
+  if ((await dropboxStatus()).state !== "connected") return null;
+  const supabase = await createClient();
+  const { data: project } = await supabase
+    .from("projects")
+    .select("name, company:companies(name)")
+    .eq("id", projectId)
+    .single<{ name: string; company: { name: string } | null }>();
+  if (!project) return "the project couldn't be found.";
+  let url: string;
+  try {
+    url = await createProjectFolder(project.name, project.company?.name ?? null);
+  } catch (e) {
+    return e instanceof Error ? e.message : "Dropbox didn't respond.";
+  }
+  const { error } = await supabase.from("projects").update({ dropbox_url: url }).eq("id", projectId);
+  return error ? error.message : null;
+}
+
+export async function makeDropboxFolder(fd: FormData) {
+  await requireAdmin();
+  const id = str(fd, "id");
+  const path = `/projects/${id}`;
+  if ((await dropboxStatus()).state !== "connected") fail(path, "Connect Dropbox on the Admin page first.");
+  const folderError = await linkDropboxFolder(id);
+  if (folderError) fail(path, `The Dropbox folder couldn't be made: ${folderError}`);
+  done(path, "Dropbox folder created and linked.");
+}
+
+export async function connectDropbox() {
+  await requireAdmin();
+  if ((await dropboxStatus()).state === "missing_setup") fail("/admin", "Dropbox isn't set up yet. See the Dropbox card.");
+  const state = randomBytes(16).toString("hex");
+  (await cookies()).set("dropbox_state", state, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 600, path: "/" });
+  redirect(authorizeUrl(await dropboxRedirectUri(), state));
+}
+
+export async function disconnectDropbox() {
+  await requireAdmin();
+  try {
+    await removeConnection();
+  } catch (e) {
+    fail("/admin", e instanceof Error ? e.message : "Couldn't disconnect Dropbox.");
+  }
+  done("/admin", "Dropbox disconnected. Existing folder links still work.");
 }
 
 export async function deleteProject(fd: FormData) {

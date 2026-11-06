@@ -73,6 +73,7 @@ Every project name is built from its parts, the same way as in Workfront: **refe
   - **Edit project** (in the Project details card): name parts, status, owner, client, dates, cost code, description and Dropbox folder link. Save as template and Delete are in the edit view too.
   - **Save as template:** copies the project's top-level tasks (subtasks are skipped), milestones, estimates and assignees into a new template.
   - Delete the project and its tasks.
+  - **Create Dropbox folder** (in Project details) for a project with no folder link yet, once Dropbox is connected.
 
 ## Board
 
@@ -234,6 +235,7 @@ Files open in Excel or Google Sheets.
 - **People:** edit name, roles (with a main role), hours per week, access (Admin or User) and Active. You can't remove your own admin access.
 - **Job roles:** the list of roles people can hold and tasks can ask for.
 - **Project names:** the next reference number, and the list of project types.
+- **Dropbox:** connect Workhub to Dropbox once for the agency. After that, each new project gets a folder (client, then project name) and its link fills in automatically. If a folder can't be made, the project is still created and you see why. Disconnect stops new folders; existing links keep working.
 - **Recent changes:** the latest changes across Workhub and who made them.
 
 ## Good to know

@@ -14,7 +14,7 @@ Custom work hub for Augustine Agency (a digital marketing agency on Microsoft 36
   - Microsoft 365 integration
   - AI on our own data
 - Target scale: about 40 users, 2 developers. No per-user costs: pick tools and services that don't charge per seat.
-- Files (later phase, not now): working files live in Dropbox (Dropbox Enterprise). Workhub will store links to Dropbox files and auto-create project folders; proofing will use Dropbox Replay first. Until then, **do not build file uploads or Supabase file storage.** People paste Dropbox links in task comments, and admins can paste a project's folder link (`projects.dropbox_url`, Dropbox links only, checked in the DB and the action).
+- Files (later phase, not now): working files live in Dropbox (Dropbox Enterprise). Workhub will store links to Dropbox files and auto-create project folders; proofing will use Dropbox Replay first. Until then, **do not build file uploads or Supabase file storage.** People paste Dropbox links in task comments, and admins can paste a project's folder link (`projects.dropbox_url`, Dropbox links only, checked in the DB and the action). Dropbox is connected once on the Admin page (OAuth, App folder app for now); the refresh token lives in `dropbox_connection`, which has no policies and is read only with the secret key (`src/lib/supabase/service.ts`, `SUPABASE_SECRET_KEY`). New projects get `/<client>/<project name>` and its share link via `src/lib/dropbox.ts`; a Dropbox failure never blocks creating a project.
 
 ## Stack
 
@@ -54,12 +54,13 @@ src/lib/                    supabase clients, session (requireProfile / requireA
 | Manage teams | ✓ | ✗ |
 | Notification settings | Own | Own ("timesheet returned" can't be turned off) |
 | Project templates (view, create, edit, delete, use, save project as template) | ✓ | ✗ |
+| Connect or disconnect Dropbox, create a project's Dropbox folder | ✓ | ✗ |
 
 When adding a feature, decide its admin/member rule first. Enforce it with an RLS policy or trigger in a new migration, check it in the server action (`requireAdmin()` / `requireProfile()`), and hide controls the person can't use.
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update, project_dropbox_link).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update, project_dropbox_link, dropbox_connection).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
