@@ -104,7 +104,7 @@ export default async function TaskPage({
     supabase
       .from("tasks")
       .select(
-        "*, task_assignees(profile_id, as_role_id), task_role_slots(id, role_id), project:projects(id, name, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id), task_role_slots(id, role_id))), parent:parent_task_id(id, title)",
+        "*, task_assignees(profile_id, as_role_id), task_role_slots(id, role_id), project:projects(id, name, dropbox_url, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id), task_role_slots(id, role_id))), parent:parent_task_id(id, title)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -129,11 +129,11 @@ export default async function TaskPage({
   if (!task) notFound();
 
   const raw = task as Raw<Task> & {
-    project: { id: string; name: string; company: { name: string } | null; tasks: Raw<ProjectTask>[] };
+    project: { id: string; name: string; dropbox_url: string | null; company: { name: string } | null; tasks: Raw<ProjectTask>[] };
     parent: { id: string; title: string } | null;
   };
   const t = { ...withAssignees(raw), project: { ...raw.project, tasks: raw.project.tasks.map(withAssignees) as ProjectTask[] } } as Task & {
-    project: { id: string; name: string; company: { name: string } | null; tasks: ProjectTask[] };
+    project: { id: string; name: string; dropbox_url: string | null; company: { name: string } | null; tasks: ProjectTask[] };
     parent: { id: string; title: string } | null;
   };
   const parent = t.parent;
@@ -608,6 +608,11 @@ export default async function TaskPage({
                   <Link href={`/projects/${t.project.id}`} className="link">{t.project.name}</Link>
                 </Field>
                 <Field label="Client">{t.project.company?.name ?? "No client"}</Field>
+                {t.project.dropbox_url && (
+                  <Field label="Files" wide>
+                    <a href={t.project.dropbox_url} target="_blank" rel="noopener noreferrer" className="link">Open the project&apos;s Dropbox folder</a>
+                  </Field>
+                )}
                 <Field label="Status"><TaskBadge status={t.status} /></Field>
                 <Field label={t.assignee_ids.length > 1 ? "Assignees" : "Assignee"} wide>
                   {t.assignee_ids.length ? (

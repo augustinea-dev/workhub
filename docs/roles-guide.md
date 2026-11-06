@@ -46,7 +46,7 @@ Every project name is built from its parts, the same way as in Workfront: **refe
 - **Everyone:** sees these on the project page and can filter the Projects list by type.
 - **Admins only:**
   - Fill them in when creating or editing a project; the name updates as you type and is saved automatically.
-  - On each client: set **Name on projects** and **Billing year** (calendar, or fiscal from a given month). Changing them updates that client's project names.
+  - On each client: set **Brand used in project names** and **Billing year** (calendar, or fiscal from a given month). Changing them updates that client's project names.
   - On the Admin page: set the **Next reference number** (it must stay above every number in use) and manage **Project types** (add, rename the label, retire).
   - For a project imported from Workfront, tick **Keep this exact name** (under "Reference number and exact name") so its name isn't rebuilt.
 
@@ -63,13 +63,14 @@ Every project name is built from its parts, the same way as in Workfront: **refe
 
 - **Everyone:**
   - The header shows the owner, due date, hours logged (and billable) and the next milestone.
+  - **Open Dropbox folder** (in the header and Project details) when the project's Dropbox folder has been linked.
   - **List** view: tasks grouped under their milestones. Each milestone shows "3 of 5 done" and its health. Tasks with no milestone are listed under "Not in a milestone".
   - **Board** view: see [Board](#board).
   - Change the status of tasks assigned to you.
 - **Admins only:**
   - Change the status of any task.
   - **Add a task:** title, assignees, start, due, milestone, and whether the task is itself a milestone.
-  - **Edit project** (in the Project details card): name parts, status, owner, client, dates, cost code and description. Save as template and Delete are in the edit view too.
+  - **Edit project** (in the Project details card): name parts, status, owner, client, dates, cost code, description and Dropbox folder link. Save as template and Delete are in the edit view too.
   - **Save as template:** copies the project's top-level tasks (subtasks are skipped), milestones, estimates and assignees into a new template.
   - Delete the project and its tasks.
 
@@ -111,7 +112,7 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 
 - **Everyone:**
   - Assigned to, due date in plain words ("tomorrow", "overdue by 2 days"), description, subtasks, and for a milestone the tasks in it.
-  - Side cards: Details (project, client, status, assignees, milestone), Dates, Hours (planned, logged, yours, remaining), History.
+  - Side cards: Details (project, client, a link to the project's Dropbox folder when there is one, status, assignees, milestone), Dates, Hours (planned, logged, yours, remaining), History.
   - Post updates and log time (see below).
 - **If you're one of the task's assignees:** a **Your status** bar with one-click To do, In progress, In review and Done.
 - **If it isn't:** a note saying who it's assigned to. You can still post updates and log time.
@@ -153,7 +154,7 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 - **Everyone:**
   - Post progress notes, questions and handoffs. Updates can't be edited once posted.
   - Type **@** to mention someone (pick from the list by name or email). They get a **Mention** in their inbox, and their name is highlighted in the update.
-  - For files, paste a Dropbox link in an update. Workhub doesn't store files.
+  - For files, paste a Dropbox link in an update, or open the project's Dropbox folder. Workhub doesn't store files.
 - **Admins only:** delete updates.
 
 ## Logging time
@@ -224,7 +225,7 @@ Files open in Excel or Google Sheets.
 **Where:** Clients in the sidebar.
 
 - **Everyone:** see each client with its active and total projects. Select a client (or **View projects**) to see its projects on the Projects page.
-- **Admins only:** add and rename clients, and set each client's name on projects and billing year. **Delete** appears only for a client with no projects; move or delete its projects first. Projects are linked to a client when they're created or edited.
+- **Admins only:** add and rename clients, and set each client's brand used in project names and billing year. **+ New project** on a client opens the new project form with that client picked. **Delete** appears only for a client with no projects; move or delete its projects first. Projects are linked to a client when they're created or edited.
 
 ## Admin page (Admins only)
 

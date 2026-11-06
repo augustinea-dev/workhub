@@ -40,6 +40,12 @@ function done(path: string, msg?: string): never {
   revalidatePath("/", "layout");
   redirect(msg ? withParam(path, "notice", msg) : path.split("?")[0]);
 }
+function dropboxUrl(fd: FormData, path: string): string | null {
+  const v = str(fd, "dropbox_url");
+  if (!v) return null;
+  if (!/^https:\/\/([a-z0-9-]+\.)*dropbox\.com\//i.test(v)) fail(path, "Paste a Dropbox link (it starts with https://www.dropbox.com/).");
+  return v;
+}
 function oneOf<T extends string>(v: string, list: { value: T }[], fallback: T): T {
   return (list.find((o) => o.value === v)?.value ?? fallback) as T;
 }
@@ -283,11 +289,13 @@ export async function createProject(fd: FormData) {
   const naming = namingFields(fd);
   if (!naming.title) fail("/projects", "Enter a project title.");
   if (str(fd, "template_id")) return createProjectFromTemplate(fd, me.id);
+  const dropbox_url = dropboxUrl(fd, "/projects");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
     .insert({
       ...naming,
+      dropbox_url,
       name: naming.title,
       company_id: opt(fd, "company_id"),
       owner_id: opt(fd, "owner_id") ?? me.id,
@@ -305,6 +313,7 @@ async function createProjectFromTemplate(fd: FormData, ownerFallback: string) {
   const naming = namingFields(fd);
   const start = optDate(fd, "start_date");
   if (!start) fail("/projects", "Pick a start date so the template's task dates can be worked out.");
+  const dropbox_url = dropboxUrl(fd, "/projects");
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_project_from_template", {
     p_template: str(fd, "template_id"),
@@ -315,7 +324,7 @@ async function createProjectFromTemplate(fd: FormData, ownerFallback: string) {
     p_due: optDate(fd, "due_date"),
   });
   if (error || !data) fail("/projects", error?.message ?? "Couldn't create the project.");
-  const { error: namingError } = await supabase.from("projects").update(naming).eq("id", data);
+  const { error: namingError } = await supabase.from("projects").update({ ...naming, dropbox_url }).eq("id", data);
   if (namingError) fail(`/projects/${data}`, `Project created, but its name couldn't be set: ${namingError.message}`);
   done(`/projects/${data}`, "Project created from the template.");
 }
@@ -342,6 +351,7 @@ export async function updateProject(fd: FormData) {
   const refText = str(fd, "reference_number");
   const reference = refText ? Number.parseInt(refText, 10) : null;
   if (refText && !(Number.isInteger(reference) && reference! > 0)) fail(path, "Reference number must be a whole number.");
+  const dropbox_url = dropboxUrl(fd, path);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
@@ -356,6 +366,7 @@ export async function updateProject(fd: FormData) {
       start_date: optDate(fd, "start_date"),
       due_date: optDate(fd, "due_date"),
       description: opt(fd, "description"),
+      dropbox_url,
     })
     .eq("id", id)
     .eq("version", int(fd, "version"))

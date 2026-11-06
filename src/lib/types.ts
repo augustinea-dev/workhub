@@ -43,6 +43,7 @@ export type Project = {
   title: string | null;
   project_type: string | null;
   cost_code: string | null;
+  dropbox_url: string | null;
   name_locked: boolean;
   version: number;
   updated_at: string;

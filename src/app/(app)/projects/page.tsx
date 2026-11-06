@@ -91,7 +91,7 @@ export default async function ProjectsPage({
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
       {me.role === "admin" && (
-      <details className="card mb-6 p-4" open={rows.length === 0}>
+      <details id="new-project" className="card mb-6 p-4" open={rows.length === 0 || sp(params.new) === "1"}>
         <summary className="cursor-pointer text-sm font-semibold">+ New project</summary>
         <form action={createProject} className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <ProjectNameFields
@@ -99,6 +99,7 @@ export default async function ProjectsPage({
             types={projectTypes.filter((t) => t.active)}
             reference={nextReference}
             today={today}
+            defaults={{ company_id: companies.some((c) => c.id === f.client) ? f.client : null }}
             idPrefix="new"
           />
           <div className="grid content-start gap-3">
@@ -117,6 +118,10 @@ export default async function ProjectsPage({
             <div>
               <label className="label" htmlFor="cost_code">Cost code</label>
               <input id="cost_code" name="cost_code" placeholder="Optional, e.g. 2020" className="input w-full" />
+            </div>
+            <div>
+              <label className="label" htmlFor="dropbox_url">Dropbox folder</label>
+              <input id="dropbox_url" name="dropbox_url" type="url" placeholder="Optional, paste the folder link" className="input w-full" />
             </div>
             {templates.length > 0 && (
               <div>

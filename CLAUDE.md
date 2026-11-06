@@ -14,7 +14,7 @@ Custom work hub for Augustine Agency (a digital marketing agency on Microsoft 36
   - Microsoft 365 integration
   - AI on our own data
 - Target scale: about 40 users, 2 developers. No per-user costs: pick tools and services that don't charge per seat.
-- Files (later phase, not now): working files live in Dropbox (Dropbox Enterprise). Workhub will store links to Dropbox files and auto-create project folders; proofing will use Dropbox Replay first. Until then, **do not build file uploads or Supabase file storage.** People paste Dropbox links in task comments.
+- Files (later phase, not now): working files live in Dropbox (Dropbox Enterprise). Workhub will store links to Dropbox files and auto-create project folders; proofing will use Dropbox Replay first. Until then, **do not build file uploads or Supabase file storage.** People paste Dropbox links in task comments, and admins can paste a project's folder link (`projects.dropbox_url`, Dropbox links only, checked in the DB and the action).
 
 ## Stack
 
@@ -59,7 +59,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update, project_dropbox_link).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.

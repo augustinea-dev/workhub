@@ -51,7 +51,7 @@ export default async function ClientsPage({
           <input id="new_client_name" name="name" required placeholder="Maloney Group" className="input w-full" />
         </div>
         <div className="min-w-48 flex-1">
-          <label className="label" htmlFor="new_client_label">Name on projects</label>
+          <label className="label" htmlFor="new_client_label">Brand used in project names</label>
           <input id="new_client_label" name="project_label" placeholder="Same as client, or a brand" className="input w-full" />
         </div>
         <div>
@@ -87,7 +87,7 @@ export default async function ClientsPage({
                           <input id={`name_${c.id}`} name="name" required defaultValue={c.name} className="input w-full" />
                         </div>
                         <div className="min-w-40 flex-1">
-                          <label className="label" htmlFor={`label_${c.id}`}>Name on projects</label>
+                          <label className="label" htmlFor={`label_${c.id}`}>Brand used in project names</label>
                           <input id={`label_${c.id}`} name="project_label" defaultValue={c.project_label ?? ""} placeholder="Same as client" className="input w-full" />
                         </div>
                         <div>
@@ -115,6 +115,7 @@ export default async function ClientsPage({
                     {isAdmin && (
                       <td className="table-cell">
                         <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                          <Link href={`/projects?client=${c.id}&status=all&new=1#new-project`} className="btn px-2.5 py-1 text-xs">+ New project</Link>
                           <Link href={`/clients?edit=${c.id}`} className="btn px-2.5 py-1 text-xs">Edit</Link>
                           {c.projects.length === 0 ? (
                             <form action={deleteCompany}>
@@ -135,7 +136,7 @@ export default async function ClientsPage({
         )}
       </div>
       <p className="mt-4 text-sm text-stone-500">
-        Projects are linked to a client when you create them on the <Link href="/projects" className="link">Projects</Link> page.
+        Use <span className="font-medium">+ New project</span> on a client, or pick the client when you create a project on the <Link href="/projects" className="link">Projects</Link> page.
       </p>
     </>
   );

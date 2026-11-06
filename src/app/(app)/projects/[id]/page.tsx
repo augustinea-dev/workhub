@@ -211,7 +211,11 @@ export default async function ProjectPage({
             </span>
           </>
         }
-      />
+      >
+        {p.dropbox_url && (
+          <a href={p.dropbox_url} target="_blank" rel="noopener noreferrer" className="btn">Open Dropbox folder</a>
+        )}
+      </PageHeader>
       <Flash error={sp(query.error)} notice={sp(query.notice)} />
 
       <div className={view === "board" ? "space-y-6" : "grid gap-6 lg:grid-cols-3"}>
@@ -503,6 +507,10 @@ export default async function ProjectPage({
                   <label className="label" htmlFor="description">Description</label>
                   <textarea id="description" name="description" rows={4} defaultValue={p.description ?? ""} className="input w-full" />
                 </div>
+                <div>
+                  <label className="label" htmlFor="dropbox_url">Dropbox folder</label>
+                  <input id="dropbox_url" name="dropbox_url" type="url" defaultValue={p.dropbox_url ?? ""} placeholder="Paste the folder link" className="input w-full" />
+                </div>
                 <div className="flex items-center gap-2">
                   <SubmitButton>Save project</SubmitButton>
                   <Link href={here} className="btn">Cancel</Link>
@@ -537,6 +545,16 @@ export default async function ProjectPage({
                 </div>
               </div>
               {p.cost_code && <div><dt className="label">Cost code</dt><dd>{p.cost_code}</dd></div>}
+              <div>
+                <dt className="label">Dropbox folder</dt>
+                <dd>
+                  {p.dropbox_url ? (
+                    <a href={p.dropbox_url} target="_blank" rel="noopener noreferrer" className="link">Open in Dropbox</a>
+                  ) : (
+                    <span className="text-stone-500">Not linked yet</span>
+                  )}
+                </dd>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><dt className="label">Start</dt><dd>{formatDate(p.start_date)}</dd></div>
                 <div><dt className="label">Due</dt><dd>{formatDate(p.due_date)}</dd></div>
