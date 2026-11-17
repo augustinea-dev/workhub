@@ -171,5 +171,6 @@ export const NOTIFICATION_KINDS: { kind: string; label: string; help: string; lo
   { kind: "mention", label: "@Mentions", help: "Someone mentions you, or a team you're in, in an update." },
   { kind: "timesheet_approved", label: "Timesheet approved", help: "Your submitted week is approved." },
   { kind: "timesheet_reopened", label: "Timesheet reopened", help: "An approved week is reopened for changes." },
+  { kind: "budget_alert", label: "Budget alerts", help: "A project you own (or any project, for Admins) passes 75%, 90% or 100% of its estimated hours." },
   { kind: "timesheet_returned", label: "Timesheet returned", help: "Your week is sent back with a note. Always on, so it isn't missed.", locked: true },
 ];

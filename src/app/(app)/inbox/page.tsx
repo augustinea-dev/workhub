@@ -34,7 +34,7 @@ export default async function InboxPage() {
       </PageHeader>
       <div className="card overflow-hidden">
         {items.length === 0 ? (
-          <Empty>You&apos;ll see assignments, mentions, new comments and timesheet decisions here.</Empty>
+          <Empty>You&apos;ll see assignments, mentions, new comments, timesheet decisions and budget alerts here.</Empty>
         ) : (
           <ul>
             {items.map((n) => (
@@ -44,10 +44,13 @@ export default async function InboxPage() {
                   {n.kind === "mention" && (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900">Mention</span>
                   )}
+                  {n.kind === "budget_alert" && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Budget</span>
+                  )}
                   {n.kind.startsWith("timesheet_") && (
                     <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">Timesheet</span>
                   )}
-                  {n.task_id || n.timesheet_id ? (
+                  {n.task_id || n.timesheet_id || n.project_id ? (
                     <a href={`/inbox/open/${n.id}`} className={`text-sm hover:underline ${n.read_at ? "" : "font-semibold"}`}>{n.summary}</a>
                   ) : (
                     <p className="text-sm font-medium">{n.summary}</p>

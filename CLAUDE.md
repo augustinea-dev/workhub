@@ -54,6 +54,7 @@ src/lib/                    supabase clients, session (requireProfile / requireA
 | Approve, return or reopen a team member's timesheet | ✓ | Team manager only, never their own |
 | Manage teams | ✓ | ✗ |
 | Notification settings | Own | Own ("timesheet returned" can't be turned off) |
+| Receive budget alerts (75%, 90%, 100% of estimates) | Every project | Projects they own |
 | Project templates (view, create, edit, delete, use, save project as template) | ✓ | ✗ |
 | Connect or disconnect Dropbox, create a project's Dropbox folder | ✓ | ✗ |
 
@@ -61,7 +62,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update, project_dropbox_link, dropbox_connection, time_entries_realtime, running_timers).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update, project_dropbox_link, dropbox_connection, time_entries_realtime, running_timers, budget_alerts).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
@@ -84,6 +85,7 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 - Subtasks: `tasks.parent_task_id`, same project, one level deep (trigger `check_task_parent`; relax it there to allow more levels). A parent's start, due and estimate are rolled up from its subtasks by `apply_subtask_rollup` / `refresh_parent_rollup`, per field, only when at least one subtask has that value. Admin-only to create, like all tasks.
 - Timesheets: one row per person per Monday week in `timesheets`, changed only through `submit_timesheet()`, `recall_timesheet()`, `decide_timesheet()` and `reopen_timesheet()` (no direct write policies). A week can't be submitted below the person's `profiles.weekly_hours` (PTO counts). Trigger `guard_locked_week` blocks time entry changes in submitted or approved weeks for everyone.
 - `docs/roles-guide.md` lists what Admins and Users can do, feature by feature, in plain language for the future onboarding doc. Update it whenever a feature lands or a permission changes.
+- Budget alerts: `check_project_budget()` runs from triggers on `time_entries` and `tasks`, compares non-PTO hours with the sum of top-level task estimates, and sends one `budget_alert` notice (the highest newly passed level) to active Admins and the project owner. Levels sent are kept in `project_budget_alerts` (no policies) and cleared when the project drops below them. The budget bar's maths is in `src/lib/budget.ts`; keep the two in step.
 - Timer: `running_timers`, one row per person (primary key `user_id`), readable and writable only by its owner. Started with `startTimer`, logged with `logTimer` (inserts a normal time entry, then deletes the timer) or dropped with `discardTimer`; `/timer` is the stop page. `getMyTimer()` in `src/lib/timer.ts`.
 - Milestones are tasks with `is_milestone`; other tasks join one through `milestone_id` (same project, enforced by trigger). Health (on track / at risk / late) is computed in `src/lib/milestones.ts`.
 

@@ -66,7 +66,7 @@ Every project name is built from its parts, the same way as in Workfront: **refe
 
 - **Everyone:**
   - The header shows the owner, due date, hours logged (and billable) and the next milestone.
-  - **Budget bar:** hours logged against the task estimates, for example "62 of 80 h · 78%". It adds up the estimates on the project's tasks (subtasks count through their parent). PTO doesn't count. The bar turns amber at 75% and red over 100%, with the hours over. With no estimates yet it says "No task estimates yet". Admins and Users see the same numbers.
+  - **Budget bar:** hours logged against the task estimates, for example "62 of 80 h · 78%". It adds up the estimates on the project's tasks (subtasks count through their parent). PTO doesn't count. The bar turns amber at 75% and red over 100%, with the hours over. With no estimates yet it says "No task estimates yet". Admins and Users see the same numbers. Passing 75%, 90% and 100% also sends a budget alert (see [Inbox](#inbox)).
   - **Open Dropbox folder** (in the header and Project details) when the project's Dropbox folder has been linked.
   - **List** view: tasks grouped under their milestones. Each milestone shows "3 of 5 done" and its health. Tasks with no milestone are listed under "Not in a milestone".
   - **Board** view: see [Board](#board).
@@ -224,7 +224,10 @@ Files open in Excel or Google Sheets.
 
 **Where:** Inbox in the sidebar (the badge shows unread).
 
-- **Everyone:** notices for tasks assigned to you, new updates on tasks you're involved in (an assignee, the project owner, or you've posted), mentions, and timesheet decisions. Opening one marks it read and takes you to the task or week. **Mark all read** clears the badge.
+- **Everyone:** notices for tasks assigned to you, new updates on tasks you're involved in (an assignee, the project owner, or you've posted), mentions, and timesheet decisions. Opening one marks it read and takes you to the task, week or project. **Mark all read** clears the badge.
+- **Budget alerts** (labelled Budget): sent once when a project's logged hours pass 75%, 90% and 100% of its task estimates (PTO doesn't count). If several levels are passed at once, only the highest is sent. If the estimates go up and the project drops back below a level, that level can be sent again later.
+  - **Admins:** get them for every project.
+  - **Users:** get them only for projects they own.
 - **Notification settings** (Inbox → Settings, or under your name in the sidebar): turn each kind of notice on or off. "Timesheet returned" is always on so a returned week isn't missed.
 
 ## Templates (Admins only)

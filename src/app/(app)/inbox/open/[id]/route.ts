@@ -9,10 +9,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .from("notification_events")
     .update({ read_at: new Date().toISOString() })
     .eq("id", id)
-    .select("task_id, timesheet:timesheets(week_start)")
+    .select("task_id, project_id, timesheet:timesheets(week_start)")
     .maybeSingle();
   const sheet = data?.timesheet as { week_start: string } | { week_start: string }[] | null | undefined;
   const week = Array.isArray(sheet) ? sheet[0]?.week_start : sheet?.week_start;
-  const target = data?.task_id ? `/tasks/${data.task_id}` : week ? `/time?week=${week}` : "/inbox";
+  const target = data?.task_id
+    ? `/tasks/${data.task_id}`
+    : week
+      ? `/time?week=${week}`
+      : data?.project_id
+        ? `/projects/${data.project_id}`
+        : "/inbox";
   return NextResponse.redirect(new URL(target, request.nextUrl.origin), { status: 303 });
 }
