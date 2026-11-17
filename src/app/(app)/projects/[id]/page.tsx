@@ -183,7 +183,7 @@ export default async function ProjectPage({
 
   return (
     <>
-      <LiveRefresh subs={[{ table: "tasks", filter: `project_id=eq.${id}` }, { table: "task_assignees" }, { table: "task_role_slots" }]} />
+      <LiveRefresh subs={[{ table: "tasks", filter: `project_id=eq.${id}` }, { table: "task_assignees" }, { table: "task_role_slots" }, { table: "time_entries", filter: `project_id=eq.${id}` }]} />
       <p className="mb-2 text-sm text-stone-500">
         <Link href="/projects" className="hover:underline">Projects</Link>
         {company && <> · {company.name}</>}
