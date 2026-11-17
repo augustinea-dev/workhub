@@ -6,8 +6,9 @@ import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { Board, type BoardCard } from "@/components/board";
 import { ConfirmDelete, FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { ProjectNameFields } from "@/components/project-name-fields";
-import { Empty, Flash, HealthBadge, PageHeader, ProjectBadge, ProjectDot, TaskBadge } from "@/components/ui";
+import { BudgetBar, Empty, Flash, HealthBadge, PageHeader, ProjectBadge, ProjectDot, TaskBadge } from "@/components/ui";
 import { ASSIGNEES, assigneeLabel, openRoleNames, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
+import { projectBudget } from "@/lib/budget";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
 import { dropboxStatus } from "@/lib/dropbox";
 import { compareTasks, hasTaskFilters, parseTaskFilters, taskFiltersQS, taskMatches, type TaskSort } from "@/lib/list-filters";
@@ -55,6 +56,7 @@ export default async function ProjectPage({
   const open = list.filter((t) => t.status !== "done");
   const totalHours = (time ?? []).reduce((s, t) => s + Number(t.hours), 0);
   const billable = (time ?? []).filter((t) => t.hour_type === "billable").reduce((s, t) => s + Number(t.hours), 0);
+  const budget = projectBudget(list, time ?? []);
   const company = companies.find((c) => c.id === p.company_id);
   const today = todayISO();
   const here = `/projects/${id}`;
@@ -214,6 +216,7 @@ export default async function ProjectPage({
                 </span>
               )}
               <span>{totalHours.toFixed(1)} h logged ({billable.toFixed(1)} billable)</span>
+              <BudgetBar budget={budget} />
             </span>
           </>
         }
@@ -407,6 +410,10 @@ export default async function ProjectPage({
                 </div>
                 <div className="md:col-span-3">
                   <RoleSlotsPicker roles={jobRoles} />
+                </div>
+                <div>
+                  <label className="label" htmlFor="new_task_estimate">Estimate (hours)</label>
+                  <input id="new_task_estimate" name="estimate_hours" type="number" step="0.25" min="0" className="input w-full" />
                 </div>
                 {milestoneGroups.length > 0 && (
                   <div className="md:col-span-3">

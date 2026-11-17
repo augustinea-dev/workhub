@@ -2,9 +2,11 @@ import Link from "next/link";
 import { takeRoleTask } from "./actions";
 import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { QuickLogRow } from "@/components/quick-log-row";
-import { Empty, Flash, PageHeader, ProjectDot } from "@/components/ui";
+import { Empty, Flash, PageHeader, ProjectDot, TaskBadge } from "@/components/ui";
+import { shortAssigneeLabel } from "@/lib/assignees";
 import { addDays, formatDate, todayISO, weekStart } from "@/lib/dates";
-import { getJobRoles, sp } from "@/lib/data";
+import { getJobRoles, getPeople, sp } from "@/lib/data";
+import { canChangeStatus } from "@/lib/permissions";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import type { TaskStatus } from "@/lib/types";
@@ -20,6 +22,16 @@ type OpenSlot = {
     project: { id: string; name: string; company: { name: string } | null } | null;
     task_assignees: { profile_id: string }[];
   } | null;
+};
+
+type ReviewRow = {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  due_date: string | null;
+  version: number;
+  project: { id: string; name: string; owner_id: string | null; dropbox_url: string | null; company: { name: string } | null };
+  task_assignees: { profile_id: string }[];
 };
 
 type Row = {
@@ -44,7 +56,17 @@ export default async function MyWorkPage({
   const today = todayISO();
   const monday = weekStart(today);
 
-  const [{ data: tasks }, { data: hours }, { data: myRoles }, jobRoles] = await Promise.all([
+  const isAdmin = me.role === "admin";
+  let reviewQuery = supabase
+    .from("tasks")
+    .select(
+      "id, title, status, due_date, version, project:projects!inner(id, name, owner_id, dropbox_url, company:companies(name)), task_assignees(profile_id)",
+    )
+    .eq("status", "in_review")
+    .order("due_date", { ascending: true, nullsFirst: false });
+  if (!isAdmin) reviewQuery = reviewQuery.eq("project.owner_id", me.id);
+
+  const [{ data: tasks }, { data: hours }, { data: myRoles }, jobRoles, { data: reviewData }, people] = await Promise.all([
     supabase
       .from("tasks")
       .select(
@@ -61,7 +83,13 @@ export default async function MyWorkPage({
       .lte("work_date", addDays(monday, 6)),
     supabase.from("profile_job_roles").select("role_id").eq("profile_id", me.id),
     getJobRoles(),
+    reviewQuery,
+    getPeople(),
   ]);
+  const reviews = ((reviewData ?? []) as unknown as ReviewRow[]).map((t) => ({
+    ...t,
+    assignee_ids: t.task_assignees.map((a) => a.profile_id),
+  }));
   const myRoleIds = (myRoles ?? []).map((r) => r.role_id as string);
   const { data: slotData } = myRoleIds.length
     ? await supabase
@@ -98,7 +126,7 @@ export default async function MyWorkPage({
 
   return (
     <>
-      <LiveRefresh subs={[{ table: "tasks" }, { table: "task_assignees", filter: `profile_id=eq.${me.id}` }, { table: "task_role_slots" }]} />
+      <LiveRefresh subs={[{ table: "tasks" }, { table: "task_assignees" }, { table: "task_role_slots" }]} />
       <PageHeader title={`Hi, ${me.full_name.split(" ")[0]}`} subtitle={filtered ? `${rows.length} of ${mine.length} open tasks assigned to you` : `${mine.length} open tasks assigned to you`}>
         <Link href="/time" className="card px-4 py-3 text-right hover:bg-stone-50">
           <span className="block text-xs uppercase tracking-wide text-stone-500">Logged this week</span>
@@ -131,6 +159,60 @@ export default async function MyWorkPage({
           )}
           {filtered && <Link href="/" className="btn">Clear filters</Link>}
         </FilterForm>
+      )}
+
+      {reviews.length > 0 && (
+        <section className="card mb-6 overflow-hidden">
+          <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
+            Waiting on review <span className="font-normal text-stone-400">· {reviews.length}</span>
+            <span className="ml-2 font-normal text-stone-500">{isAdmin ? "All projects" : "Projects you own"}</span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px]">
+              <thead>
+                <tr>
+                  <th className="table-head">Task</th>
+                  <th className="table-head w-40">People</th>
+                  <th className="table-head w-28">Due</th>
+                  <th className="table-head w-36">Status</th>
+                  <th className="table-head w-32"><span className="sr-only">Dropbox</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviews.map((t) => (
+                  <tr key={t.id} className="border-b border-stone-100 last:border-0">
+                    <td className="table-cell">
+                      <Link href={`/tasks/${t.id}`} className="font-medium hover:underline">{t.title}</Link>
+                      <p className="flex items-center gap-1.5 truncate text-xs text-stone-500">
+                        <ProjectDot id={t.project.id} />
+                        {t.project.company?.name ? `${t.project.company.name} · ` : ""}
+                        {t.project.name}
+                      </p>
+                    </td>
+                    <td className="table-cell text-stone-600">{shortAssigneeLabel(t.assignee_ids, people, me.id)}</td>
+                    <td className={`table-cell whitespace-nowrap ${t.due_date && t.due_date < today ? "font-medium text-red-700" : "text-stone-600"}`}>
+                      {formatDate(t.due_date)}
+                    </td>
+                    <td className="table-cell">
+                      {canChangeStatus(me, t) ? (
+                        <TaskStatusSelect id={t.id} version={t.version} status={t.status} redirectTo="/" />
+                      ) : (
+                        <TaskBadge status={t.status} />
+                      )}
+                    </td>
+                    <td className="table-cell text-right">
+                      {t.project.dropbox_url && (
+                        <a href={t.project.dropbox_url} target="_blank" rel="noopener noreferrer" className="link whitespace-nowrap text-sm">
+                          Open Dropbox
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {openWork.length > 0 && (

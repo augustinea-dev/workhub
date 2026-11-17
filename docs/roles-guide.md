@@ -32,6 +32,9 @@ Filters live in the page address, so a filtered view can be bookmarked or shared
 **Where:** My Work in the sidebar.
 
 - **Everyone:** see your open tasks, grouped into Overdue, Due this week, Later and No due date. Change a task's status from the list. The "Logged this week" card shows your hours for Monday to Sunday and links to the Time page.
+- **Waiting on review:** a list of tasks in the "In review" status, with the people on each task, its due date and a link to the project's Dropbox folder. It only appears when there's something to review.
+  - **Admins:** see every task in review, on all projects, and can change their status.
+  - **Users:** see tasks in review on projects they own. They can change the status only of tasks they're assigned to; the others show the status as a badge.
 
 ## Project names
 
@@ -63,13 +66,14 @@ Every project name is built from its parts, the same way as in Workfront: **refe
 
 - **Everyone:**
   - The header shows the owner, due date, hours logged (and billable) and the next milestone.
+  - **Budget bar:** hours logged against the task estimates, for example "62 of 80 h · 78%". It adds up the estimates on the project's tasks (subtasks count through their parent). PTO doesn't count. The bar turns amber at 75% and red over 100%, with the hours over. With no estimates yet it says "No task estimates yet". Admins and Users see the same numbers.
   - **Open Dropbox folder** (in the header and Project details) when the project's Dropbox folder has been linked.
   - **List** view: tasks grouped under their milestones. Each milestone shows "3 of 5 done" and its health. Tasks with no milestone are listed under "Not in a milestone".
   - **Board** view: see [Board](#board).
   - Change the status of tasks assigned to you.
 - **Admins only:**
   - Change the status of any task.
-  - **Add a task:** title, assignees, start, due, milestone, and whether the task is itself a milestone.
+  - **Add a task:** title, assignees, start, due, estimate (hours), milestone, and whether the task is itself a milestone.
   - **Edit project** (in the Project details card): name parts, status, owner, client, dates, cost code, description and Dropbox folder link. Save as template and Delete are in the edit view too.
   - **Save as template:** copies the project's top-level tasks (subtasks are skipped), milestones, estimates and assignees into a new template.
   - Delete the project and its tasks.
