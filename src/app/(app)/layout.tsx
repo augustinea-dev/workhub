@@ -37,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             )}
           </NavLink>
           {me.role === "admin" && <NavLink href="/templates">Templates</NavLink>}
+          {me.role === "admin" && <NavLink href="/reports">Reports</NavLink>}
           {me.role === "admin" && <NavLink href="/admin">Admin</NavLink>}
         </nav>
         {timer?.task && <TimerBadge taskId={timer.task_id} title={timer.task.title} startedAt={timer.started_at} />}

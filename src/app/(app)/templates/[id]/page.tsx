@@ -7,7 +7,7 @@ import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { Empty, Flash } from "@/components/ui";
 import { addWorkingDays, formatDay, isValidISODate, todayISO } from "@/lib/dates";
 import { pickerOptions } from "@/lib/assignees";
-import { getJobRoles, getPeople, sp } from "@/lib/data";
+import { getHolidays, getJobRoles, getPeople, sp } from "@/lib/data";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import type { JobRole, Profile, ProjectTemplate, TemplateTask } from "@/lib/types";
@@ -114,7 +114,8 @@ export default async function TemplatePage({
   );
   const milestones = tasks.filter((x) => x.is_milestone);
   const requested = sp(query.start);
-  const sampleStart = addWorkingDays(requested && isValidISODate(requested) ? requested : todayISO(), 0);
+  const holidays = new Set((await getHolidays()).map((h) => h.day));
+  const sampleStart = addWorkingDays(requested && isValidISODate(requested) ? requested : todayISO(), 0, holidays);
   const length = tasks.length ? Math.max(...tasks.map((x) => x.due_day)) + 1 : 0;
   const milestoneTitle = new Map(milestones.map((m) => [m.id, m.title]));
   const grid = "grid items-end gap-2 md:grid-cols-4 xl:grid-cols-[minmax(12rem,1fr)_5.5rem_5.5rem_5.5rem_11rem_14rem]";
@@ -152,8 +153,8 @@ export default async function TemplatePage({
           ) : (
             <ul>
               {tasks.map((task) => {
-                const from = addWorkingDays(sampleStart, task.start_day);
-                const to = addWorkingDays(sampleStart, task.due_day);
+                const from = addWorkingDays(sampleStart, task.start_day, holidays);
+                const to = addWorkingDays(sampleStart, task.due_day, holidays);
                 return (
                   <li key={task.id} className={`border-b border-stone-100 px-4 py-4 ${task.is_milestone ? "bg-stone-50" : ""}`}>
                     <p className="mb-2 flex flex-wrap items-center gap-x-3 text-xs text-stone-500">

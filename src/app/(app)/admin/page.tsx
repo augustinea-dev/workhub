@@ -1,9 +1,9 @@
-import { connectDropbox, disconnectDropbox, saveJobRole, saveProjectType, saveTeam, updateMember, updateNextReference } from "../actions";
-import { SubmitButton } from "@/components/client";
+import { addHoliday, connectDropbox, deleteHoliday, disconnectDropbox, saveJobRole, saveProjectType, saveTeam, updateMember, updateNextReference } from "../actions";
+import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { Flash, PageHeader } from "@/components/ui";
-import { formatTimestamp } from "@/lib/dates";
+import { addWorkingDays, formatDate, formatTimestamp, todayISO } from "@/lib/dates";
 import { dropboxStatus } from "@/lib/dropbox";
-import { getJobRoles, getNextReference, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
+import { getHolidays, getJobRoles, getNextReference, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
 import { AssigneePicker } from "@/components/assignee-picker";
 import { pickerOptions } from "@/lib/assignees";
 import { requireAdmin } from "@/lib/session";
@@ -33,7 +33,18 @@ export default async function AdminPage({
     getJobRoles(),
     dropboxStatus(),
   ]);
-  const teams = await getTeams();
+  const [teams, holidays] = await Promise.all([getTeams(), getHolidays()]);
+  const today = todayISO();
+  const holidayGroups: { name: string; from: string; to: string; ids: string[] }[] = [];
+  for (const h of holidays.filter((x) => x.day >= today.slice(0, 4) + "-01-01")) {
+    const last = holidayGroups[holidayGroups.length - 1];
+    if (last && last.name === h.name && addWorkingDays(last.to, 1) === h.day) {
+      last.to = h.day;
+      last.ids.push(h.id);
+    } else holidayGroups.push({ name: h.name, from: h.day, to: h.day, ids: [h.id] });
+  }
+  const dayLabel = (iso: string) =>
+    `${new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })} ${formatDate(iso)}`;
   const roleName = (id: string) => jobRoles.find((r) => r.id === id)?.name ?? "Role";
   const holders = (roleId: string) => people.filter((p) => p.job_roles?.some((x) => x.role_id === roleId)).length;
   const supabase = await createClient();
@@ -198,6 +209,60 @@ export default async function AdminPage({
             <input type="hidden" name="active" value="on" />
             <input name="name" required placeholder="New role, e.g. Producer" aria-label="New role name" className="input w-56 py-1.5" />
             <SubmitButton className="btn py-1.5" pendingText="Adding…">Add role</SubmitButton>
+          </form>
+        </div>
+      </section>
+
+      <section id="holidays" className="card mb-6 overflow-x-auto">
+        <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">Holidays</h2>
+        <div className="space-y-2 px-4 py-3">
+          <p className="mb-1 text-xs text-stone-500">
+            Days the agency is closed. They aren&apos;t counted as working days: template dates skip them, and Reports leave them out of
+            available and planned hours. Add a single day, or a From and To range (weekends are skipped). Changing holidays doesn&apos;t move dates on projects that already exist.
+          </p>
+          {holidayGroups.length === 0 ? (
+            <p className="text-sm text-stone-500">No holidays this year yet.</p>
+          ) : (
+            <ul className="divide-y divide-stone-100">
+              {holidayGroups.map((g) => (
+                <li key={g.ids[0]} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+                  <span>
+                    <span className="mr-3 inline-block min-w-52 tabular-nums text-stone-600">
+                      {dayLabel(g.from)}
+                      {g.to !== g.from && ` to ${dayLabel(g.to)}`} {g.to.slice(0, 4)}
+                    </span>
+                    {g.name}
+                    {g.ids.length > 1 && <span className="text-stone-400"> · {g.ids.length} days</span>}
+                  </span>
+                  <form action={deleteHoliday}>
+                    {g.ids.map((id) => (
+                      <input key={id} type="hidden" name="id" value={id} />
+                    ))}
+                    <ConfirmDelete
+                      question={g.ids.length > 1 ? `Remove all ${g.ids.length} days of ${g.name}?` : `Remove ${g.name}?`}
+                      className="text-xs font-medium text-stone-500 hover:text-red-700"
+                    >
+                      Remove
+                    </ConfirmDelete>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={addHoliday} className="flex flex-wrap items-end gap-2 border-t border-stone-100 pt-3">
+            <div>
+              <label className="label" htmlFor="hol_from">From</label>
+              <input id="hol_from" name="day" type="date" required className="input w-44 py-1.5" />
+            </div>
+            <div>
+              <label className="label" htmlFor="hol_to">To (optional)</label>
+              <input id="hol_to" name="to" type="date" className="input w-44 py-1.5" />
+            </div>
+            <div>
+              <label className="label" htmlFor="hol_name">Name</label>
+              <input id="hol_name" name="name" required placeholder="e.g. Thanksgiving" className="input w-56 py-1.5" />
+            </div>
+            <SubmitButton className="btn py-1.5" pendingText="Adding…">Add holiday</SubmitButton>
           </form>
         </div>
       </section>

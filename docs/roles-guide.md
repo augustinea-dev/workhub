@@ -237,8 +237,28 @@ Files open in Excel or Google Sheets.
 - Create a template, then add its tasks: title, start day and due day (working days from the project start, Monday to Friday; day 0 is the start), hours, type (Task, Milestone, or part of a milestone), default assignees and description.
 - **Preview dates for a start on** shows the real dates for any start date.
 - Use a template from **+ New project** on the Projects page. Default assignees who are inactive are left Unassigned.
+- Working days skip weekends and the holidays on the Admin page.
 - Changing or deleting a template doesn't affect projects already created from it.
 - Users don't see templates.
+
+## Reports (Admins only)
+
+**Where:** Reports in the sidebar. Users don't see the link, and the page and its export turn them away.
+
+- **Utilization**, with three views:
+  - **By person:** one row per person.
+  - **By job role:** people grouped under their main role, with a total per role. Open roles on tasks show as hours "not yet assigned" for that role.
+  - **By project:** each project's estimate, planned and worked hours in the dates, hours logged to date and budget used (the same number as the project's budget bar).
+- **What the numbers mean:**
+  - **Available:** the person's hours per week spread over the working days in the dates (weekends and holidays left out), minus PTO they logged.
+  - **Planned:** each task's estimate spread evenly over the working days from its start to its due date, split equally among its people and open roles. A task with only one date puts all its hours on that day. A parent task whose subtasks have estimates is counted through the subtasks.
+  - **Worked** (everything but PTO) and **Billable**, as logged, whether or not the week is submitted.
+  - **Planned util.** (planned ÷ available, red over 100%), **Actual util.** (worked ÷ available) and **Billable util.** (billable ÷ available).
+- **Future dates work:** pick next week or next month to see planned load against capacity before the work happens.
+- **Break down** by week or month to see each period side by side. Each cell shows planned ÷ available, the hours, and what was worked so far.
+- **Unscheduled:** open tasks with estimates but no dates are listed below the report, since they can't be placed on the calendar.
+- **Filters:** this, last or next week; this, last or next month; custom dates; and a team.
+- **Export CSV** follows the view, dates, team and breakdown.
 
 ## Clients
 
@@ -253,6 +273,7 @@ Files open in Excel or Google Sheets.
 
 - **People:** edit name, roles (with a main role), hours per week, access (Admin or User) and Active. You can't remove your own admin access.
 - **Job roles:** the list of roles people can hold and tasks can ask for.
+- **Holidays:** days the agency is closed. Add one day, or a From and To range such as Thanksgiving, Nov 25 to Nov 27 (weekends are skipped, days already on the list are left as they are). A range shows as one line and is removed in one click. Template dates skip them, and Reports leave them out of available and planned hours. Adding one doesn't move dates on existing projects. Everyone can see holidays; only Admins add or remove them.
 - **Project names:** the next reference number, and the list of project types.
 - **Dropbox:** connect Workhub to Dropbox once for the agency. After that, each new project gets a folder (client, then project name) and its link fills in automatically. If a folder can't be made, the project is still created and you see why. Disconnect stops new folders; existing links keep working.
 - **Recent changes:** the latest changes across Workhub and who made them.

@@ -76,14 +76,18 @@ export function relativeDay(iso: string, today: string): string {
   return n > 0 ? `in ${n} days` : `${-n} days ago`;
 }
 
-/** Same rule as public.add_working_days: roll a weekend start to Monday, then count Mon to Fri. */
-export function addWorkingDays(iso: string, n: number): string {
-  const d = parse(iso);
-  const isWeekend = () => d.getUTCDay() === 0 || d.getUTCDay() === 6;
-  while (isWeekend()) d.setUTCDate(d.getUTCDate() + 1);
+export function isWorkingDay(iso: string, holidays: ReadonlySet<string> = new Set()): boolean {
+  const dow = parse(iso).getUTCDay();
+  return dow !== 0 && dow !== 6 && !holidays.has(iso);
+}
+
+/** Same rule as public.add_working_days: roll a non-working start forward, then count Mon to Fri, skipping holidays. */
+export function addWorkingDays(iso: string, n: number, holidays: ReadonlySet<string> = new Set()): string {
+  let d = iso;
+  while (!isWorkingDay(d, holidays)) d = addDays(d, 1);
   for (let i = 0; i < n; ) {
-    d.setUTCDate(d.getUTCDate() + 1);
-    if (!isWeekend()) i++;
+    d = addDays(d, 1);
+    if (isWorkingDay(d, holidays)) i++;
   }
-  return toISO(d);
+  return d;
 }

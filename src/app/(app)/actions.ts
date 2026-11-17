@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireProfile } from "@/lib/session";
 import { getPeople, getTeams } from "@/lib/data";
-import { isValidISODate } from "@/lib/dates";
+import { addDays, daysBetween, isValidISODate, isWorkingDay } from "@/lib/dates";
 import { authorizeUrl, createProjectFolder, dropboxStatus, removeConnection } from "@/lib/dropbox";
 import { dropboxRedirectUri } from "@/lib/dropbox-redirect";
 import { HOUR_TYPES, NOTIFICATION_KINDS, PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
@@ -195,6 +195,39 @@ export async function saveJobRole(fd: FormData) {
     : await supabase.from("job_roles").insert(row);
   if (error) fail("/admin", error.code === "23505" ? `${name} already exists.` : error.message);
   done("/admin", `Saved the ${name} role.`);
+}
+
+export async function addHoliday(fd: FormData) {
+  await requireAdmin();
+  const back = "/admin#holidays";
+  const from = optDate(fd, "day");
+  const to = optDate(fd, "to") ?? from;
+  const name = str(fd, "name");
+  if (!from || !to || !name) fail(back, "Pick a date and give the holiday a name.");
+  if (to < from) fail(back, "The end date can't be before the start date.");
+  if (daysBetween(from, to) > 31) fail(back, "Add up to a month at a time.");
+  const days: string[] = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) if (isWorkingDay(d)) days.push(d);
+  if (!days.length) fail(back, "Those dates are all on a weekend, which is never a working day.");
+  const supabase = await createClient();
+  const { data: existing } = await supabase.from("holidays").select("day").in("day", days);
+  const taken = new Set((existing ?? []).map((h) => h.day as string));
+  const fresh = days.filter((d) => !taken.has(d));
+  if (!fresh.length) fail(back, "Those days are already holidays.");
+  const { error } = await supabase.from("holidays").insert(fresh.map((day) => ({ day, name })));
+  if (error) fail(back, error.message);
+  const skipped = taken.size ? ` ${taken.size} ${taken.size === 1 ? "day was" : "days were"} already a holiday and left as is.` : "";
+  done(back, `Added ${name} (${fresh.length} ${fresh.length === 1 ? "day" : "days"}).${skipped}`);
+}
+
+export async function deleteHoliday(fd: FormData) {
+  await requireAdmin();
+  const ids = fd.getAll("id").filter((v): v is string => typeof v === "string" && !!v);
+  if (!ids.length) fail("/admin#holidays", "Nothing to remove.");
+  const supabase = await createClient();
+  const { error } = await supabase.from("holidays").delete().in("id", ids);
+  if (error) fail("/admin#holidays", error.message);
+  done("/admin#holidays", "Holiday removed.");
 }
 
 // ---------- teams (admin) ----------

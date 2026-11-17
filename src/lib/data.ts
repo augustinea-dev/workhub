@@ -33,6 +33,12 @@ export function managedIds(teams: Team[], meId: string): string[] {
   );
 }
 
+export const getHolidays = cache(async (): Promise<{ id: string; day: string; name: string }[]> => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("holidays").select("id, day, name").order("day");
+  return (data ?? []) as { id: string; day: string; name: string }[];
+});
+
 export const getJobRoles = cache(async (): Promise<JobRole[]> => {
   const supabase = await createClient();
   const { data } = await supabase.from("job_roles").select("*").order("name");
