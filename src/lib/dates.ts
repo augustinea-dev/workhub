@@ -54,6 +54,10 @@ export function formatTimestamp(ts: string): string {
   });
 }
 
+export function dateOf(ts: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(ts));
+}
+
 export function isValidISODate(v: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(parse(v).getTime());
 }

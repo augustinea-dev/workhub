@@ -1,4 +1,6 @@
-import { Toast } from "@/components/client";
+import Link from "next/link";
+import { startTimer } from "@/app/(app)/actions";
+import { SubmitButton, Toast } from "@/components/client";
 import { projectColor } from "@/lib/colors";
 import type { Budget } from "@/lib/budget";
 import type { Health } from "@/lib/milestones";
@@ -127,5 +129,24 @@ export function ProjectDot({ id, size = "sm" }: { id: string; size?: "sm" | "lg"
       className={`inline-block shrink-0 rounded ${size === "lg" ? "h-3.5 w-3.5" : "h-2.5 w-2.5"}`}
       style={{ backgroundColor: projectColor(id) }}
     />
+  );
+}
+
+export function TimerButton({ taskId, runningTaskId, redirectTo }: { taskId: string; runningTaskId: string | null; redirectTo: string }) {
+  if (runningTaskId === taskId) {
+    return (
+      <Link href="/timer" className="btn whitespace-nowrap border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-900 hover:bg-emerald-100">
+        Timing · Stop
+      </Link>
+    );
+  }
+  return (
+    <form action={startTimer}>
+      <input type="hidden" name="task_id" value={taskId} />
+      <input type="hidden" name="redirect_to" value={redirectTo} />
+      <SubmitButton pendingText="Starting…" className="btn whitespace-nowrap px-2.5 py-1 text-xs">
+        Start timer
+      </SubmitButton>
+    </form>
   );
 }

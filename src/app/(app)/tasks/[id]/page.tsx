@@ -6,7 +6,8 @@ import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { ConfirmDelete, LiveRefresh, SubmitButton } from "@/components/client";
 import { MentionComposer } from "@/components/mention-composer";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
-import { Empty, Flash, HealthBadge, TaskBadge } from "@/components/ui";
+import { Empty, Flash, HealthBadge, TaskBadge, TimerButton } from "@/components/ui";
+import { getMyTimer } from "@/lib/timer";
 import { assigneeLabel, openRoleNames, pickerOptions, roleIdsOf, withAssignees } from "@/lib/assignees";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
 import { getJobRoles, getPeople, getTeams, nameOf, sp } from "@/lib/data";
@@ -158,6 +159,7 @@ export default async function TaskPage({
   const here = `/tasks/${id}`;
   const editing = isAdmin && sp(query.edit) === "1";
   const today = todayISO();
+  const timer = await getMyTimer();
   const isAssignee = t.assignee_ids.includes(me.id);
   const isDone = t.status === "done";
   const dueIn = t.due_date ? daysBetween(today, t.due_date) : null;
@@ -476,10 +478,13 @@ export default async function TaskPage({
           </section>
 
           <section className="card">
-            <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
-              Time <span className="font-normal text-stone-400">· {hrs(logged)} logged</span>
-              {estimate != null && <span className="font-normal text-stone-400"> of {hrs(estimate)} planned</span>}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5">
+              <h2 className="text-sm font-semibold">
+                Time <span className="font-normal text-stone-400">· {hrs(logged)} logged</span>
+                {estimate != null && <span className="font-normal text-stone-400"> of {hrs(estimate)} planned</span>}
+              </h2>
+              <TimerButton taskId={id} runningTaskId={timer?.task_id ?? null} redirectTo={here} />
+            </div>
             {timeRows.length === 0 ? (
               <Empty>No time logged on this task yet.</Empty>
             ) : (

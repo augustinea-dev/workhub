@@ -730,6 +730,53 @@ export async function logTime(fd: FormData) {
   done(back, `Logged ${hours} h.`);
 }
 
+export async function startTimer(fd: FormData) {
+  await requireProfile();
+  const back = safePath(str(fd, "redirect_to"), "/");
+  const taskId = str(fd, "task_id");
+  if (!taskId) fail(back, "Pick a task.");
+  const supabase = await createClient();
+  const { data: running } = await supabase.from("running_timers").select("task_id, task:tasks(title)").maybeSingle();
+  if (running) {
+    if (running.task_id === taskId) done(back, "Your timer is already running on this task.");
+    const title = (running.task as unknown as { title: string } | null)?.title ?? "another task";
+    fail(back, `Your timer is running on "${title}". Stop it first, then log or discard that time.`);
+  }
+  const { error } = await supabase.from("running_timers").insert({ task_id: taskId });
+  if (error) fail(back, error.message);
+  done(back, "Timer started.");
+}
+
+export async function logTimer(fd: FormData) {
+  const me = await requireProfile();
+  const back = "/timer";
+  const hours = Number.parseFloat(str(fd, "hours"));
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) fail(back, "Hours must be between 0 and 24.");
+  const supabase = await createClient();
+  const { data: timer } = await supabase.from("running_timers").select("task_id").maybeSingle();
+  if (!timer) fail("/", "Your timer isn't running any more.");
+  const { error } = await supabase.from("time_entries").insert({
+    task_id: timer.task_id,
+    user_id: me.id,
+    work_date: optDate(fd, "work_date") ?? undefined,
+    hours,
+    hour_type: oneOf(str(fd, "hour_type"), HOUR_TYPES, "billable"),
+    note: opt(fd, "note"),
+  });
+  if (error) fail(back, error.message);
+  await supabase.from("running_timers").delete().eq("user_id", me.id);
+  done(`/tasks/${timer.task_id}`, `Logged ${hours} h. Timer stopped.`);
+}
+
+export async function discardTimer() {
+  const me = await requireProfile();
+  const supabase = await createClient();
+  const { data: timer } = await supabase.from("running_timers").select("task_id").maybeSingle();
+  const { error } = await supabase.from("running_timers").delete().eq("user_id", me.id);
+  if (error) fail("/timer", error.message);
+  done(timer ? `/tasks/${timer.task_id}` : "/", "Timer discarded. Nothing was logged.");
+}
+
 /** Edit a time entry: your own, or anyone's if you're an admin (enforced by RLS). */
 export async function updateTime(fd: FormData) {
   await requireProfile();

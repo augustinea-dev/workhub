@@ -2,7 +2,8 @@ import Link from "next/link";
 import { takeRoleTask } from "./actions";
 import { FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { QuickLogRow } from "@/components/quick-log-row";
-import { Empty, Flash, PageHeader, ProjectDot, TaskBadge } from "@/components/ui";
+import { Empty, Flash, PageHeader, ProjectDot, TaskBadge, TimerButton } from "@/components/ui";
+import { getMyTimer } from "@/lib/timer";
 import { shortAssigneeLabel } from "@/lib/assignees";
 import { addDays, formatDate, todayISO, weekStart } from "@/lib/dates";
 import { getJobRoles, getPeople, sp } from "@/lib/data";
@@ -86,6 +87,8 @@ export default async function MyWorkPage({
     reviewQuery,
     getPeople(),
   ]);
+  const timer = await getMyTimer();
+  const runningTaskId = timer?.task_id ?? null;
   const reviews = ((reviewData ?? []) as unknown as ReviewRow[]).map((t) => ({
     ...t,
     assignee_ids: t.task_assignees.map((a) => a.profile_id),
@@ -275,12 +278,19 @@ export default async function MyWorkPage({
                         <th className="table-head">Task</th>
                         <th className="table-head w-28">Due</th>
                         <th className="table-head w-36">Status</th>
-                        <th className="table-head w-28"><span className="sr-only">Log time</span></th>
+                        <th className="table-head w-56"><span className="sr-only">Timer and log time</span></th>
                       </tr>
                     </thead>
                     <tbody>
                       {g.items.map((t) => (
-                        <QuickLogRow key={t.id} taskId={t.id} title={t.title} today={today} columns={3}>
+                        <QuickLogRow
+                          key={t.id}
+                          taskId={t.id}
+                          title={t.title}
+                          today={today}
+                          columns={3}
+                          extra={<TimerButton taskId={t.id} runningTaskId={runningTaskId} redirectTo="/" />}
+                        >
                           <td className="table-cell">
                             <Link href={`/tasks/${t.id}`} className="font-medium hover:underline">
                               {t.is_milestone && <span title="Milestone">◆ </span>}

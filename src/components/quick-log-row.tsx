@@ -11,6 +11,7 @@ export function QuickLogRow({
   title,
   today,
   columns,
+  extra,
   children,
 }: {
   taskId: string;
@@ -18,6 +19,7 @@ export function QuickLogRow({
   today: string;
   /** Number of cells in `children`, so the form row spans the table. */
   columns: number;
+  extra?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -25,15 +27,18 @@ export function QuickLogRow({
     <>
       <tr className={open ? "bg-stone-50" : "hover:bg-stone-50"}>
         {children}
-        <td className="table-cell text-right">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            className="btn whitespace-nowrap px-2.5 py-1 text-xs"
-          >
-            {open ? "Close" : "Log time"}
-          </button>
+        <td className="table-cell">
+          <div className="flex items-center justify-end gap-1.5">
+            {extra}
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              className="btn whitespace-nowrap px-2.5 py-1 text-xs"
+            >
+              {open ? "Close" : "Log time"}
+            </button>
+          </div>
         </td>
       </tr>
       {open && (

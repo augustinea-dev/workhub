@@ -1,17 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
-import { NavLink } from "@/components/client";
+import { NavLink, TimerBadge } from "@/components/client";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import { getMyTimer } from "@/lib/timer";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const me = await requireProfile();
   const supabase = await createClient();
-  const { count: unread } = await supabase
-    .from("notification_events")
-    .select("id", { count: "exact", head: true })
-    .eq("recipient_id", me.id)
-    .is("read_at", null);
+  const [{ count: unread }, timer] = await Promise.all([
+    supabase.from("notification_events").select("id", { count: "exact", head: true }).eq("recipient_id", me.id).is("read_at", null),
+    getMyTimer(),
+  ]);
 
   return (
     <div className="min-h-screen md:flex">
@@ -39,6 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {me.role === "admin" && <NavLink href="/templates">Templates</NavLink>}
           {me.role === "admin" && <NavLink href="/admin">Admin</NavLink>}
         </nav>
+        {timer?.task && <TimerBadge taskId={timer.task_id} title={timer.task.title} startedAt={timer.started_at} />}
         <div className="hidden border-t border-white/10 px-4 py-4 md:absolute md:bottom-0 md:block md:w-56">
           <p className="truncate text-sm font-medium">{me.full_name}</p>
           <p className="truncate text-xs text-white/60">{me.email}</p>

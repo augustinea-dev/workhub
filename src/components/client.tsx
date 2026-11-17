@@ -230,3 +230,33 @@ export function Toast({ error, notice }: { error?: string; notice?: string }) {
     </div>
   );
 }
+
+function clock(startedAt: string): string {
+  const secs = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${Math.floor(secs / 3600)}:${pad(Math.floor(secs / 60) % 60)}:${pad(secs % 60)}`;
+}
+
+export function TimerBadge({ taskId, title, startedAt }: { taskId: string; title: string; startedAt: string }) {
+  const [time, setTime] = useState<string | null>(null);
+  useEffect(() => {
+    const tick = () => setTime(clock(startedAt));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  return (
+    <div className="mx-2 mb-3 rounded-md bg-white/10 px-3 py-2 text-sm md:mx-2 md:mt-3">
+      <p className="flex items-center gap-2 font-medium">
+        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400 motion-reduce:animate-none" aria-hidden="true" />
+        <span className="tabular-nums" aria-label="Timer running">{time ?? "0:00:00"}</span>
+      </p>
+      <Link href={`/tasks/${taskId}`} className="mt-0.5 block truncate text-xs text-white/75 hover:text-white">
+        {title}
+      </Link>
+      <Link href="/timer" className="mt-2 inline-block rounded bg-white px-2 py-0.5 text-xs font-semibold text-stone-900 hover:bg-white/90">
+        Stop
+      </Link>
+    </div>
+  );
+}

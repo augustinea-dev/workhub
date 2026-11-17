@@ -174,6 +174,18 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 - **Admins only:** edit or remove anyone's entries (same lock applies), and view anyone's week on the Time page.
 - **Team managers:** can view their team members' weeks on the Time page (pick them under Person).
 
+## Timer
+
+**Where:** **Start timer** on each task row in My Work and in the Time card on a task page.
+
+- **Everyone (Admins and Users):**
+  - Run one timer at a time, on any task. It shows in the sidebar with the time so far and a **Stop** button, on every page.
+  - **Stop** opens a form with the hours filled in (rounded to the quarter hour), Billable, and the date the timer started. Change anything, then **Log time and stop**, or **Discard timer without logging**.
+  - Starting a timer on another task while one is running is blocked: stop the first one, then log or discard it.
+  - A timer that ran more than 10 hours shows a warning to check the hours first.
+  - Timers are private. Nobody else, Admins included, can see, stop or change your timer.
+  - The time you log follows the usual rules: a submitted or approved week stays locked, and the form says so.
+
 ## Timesheets
 
 **Where:** the Time page. Weeks run Monday to Sunday (Pacific time).
