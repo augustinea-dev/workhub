@@ -17,6 +17,7 @@ export type TimeRow = {
   dayLabel: string;
   project?: { id: string; name: string } | null;
   task?: { id: string; title: string } | null;
+  category?: { name: string; group_name: string } | null;
 };
 
 const GRID = "grid grid-cols-[7.5rem_10rem_4.5rem_7rem_minmax(12rem,1fr)_6.5rem] gap-3 items-start";
@@ -47,7 +48,7 @@ export function TimeEntryTable({
       <div className="min-w-[760px]">
         <div className={`${GRID} border-b border-stone-200 px-4 py-2 text-xs font-medium uppercase tracking-wide text-stone-500`}>
           <span>Date</span>
-          <span>{second === "person" ? "Person" : "Project / task"}</span>
+          <span>{second === "person" ? "Person" : "Work"}</span>
           <span className="text-right">Hours</span>
           <span>Type</span>
           <span>Note</span>
@@ -88,6 +89,11 @@ function Row({
         <span className="min-w-0">
           {second === "person" ? (
             r.personName
+          ) : r.category ? (
+            <span className="text-stone-700">
+              <span className="text-stone-400">{r.category.group_name}: </span>
+              {r.category.name}
+            </span>
           ) : (
             <>
               {r.project && (
@@ -125,7 +131,7 @@ function Row({
 
       {editing && (
         <div className="bg-stone-50 px-4 py-3">
-          <form action={updateTime} className="grid gap-2 md:grid-cols-[9rem_6rem_9rem_1fr]">
+          <form action={updateTime} className="grid gap-2 md:grid-cols-[9rem_6rem_1fr]">
             <input type="hidden" name="id" value={r.id} />
             <input type="hidden" name="redirect_to" value={redirectTo} />
             <label className="text-xs text-stone-600">
@@ -146,20 +152,10 @@ function Row({
               />
             </label>
             <label className="text-xs text-stone-600">
-              Type
-              <select name="hour_type" defaultValue={r.hour_type} className="input mt-1 w-full">
-                {HOUR_TYPES.map((h) => (
-                  <option key={h.value} value={h.value}>
-                    {h.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs text-stone-600">
               Note
               <textarea name="note" rows={2} defaultValue={r.note ?? ""} className="input mt-1 w-full" />
             </label>
-            <div className="flex items-center gap-2 md:col-span-4">
+            <div className="flex items-center gap-2 md:col-span-3">
               <SubmitButton>Save changes</SubmitButton>
               <button type="button" onClick={() => setEditing(false)} className="btn">
                 Cancel

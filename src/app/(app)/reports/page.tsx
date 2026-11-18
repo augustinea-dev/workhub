@@ -255,7 +255,7 @@ export default async function ReportsPage({
                       <th className="table-head text-right">Planned</th>
                       <th className="table-head text-right">Worked</th>
                       <th className="table-head text-right">Billable</th>
-                      <th className="table-head text-right">PTO</th>
+                      <th className="table-head text-right">Time off</th>
                       <th className="table-head" title="Planned ÷ available">Planned util.</th>
                       <th className="table-head" title="Worked ÷ available">Actual util.</th>
                       <th className="table-head" title="Billable ÷ available">Billable util.</th>

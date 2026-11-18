@@ -2,10 +2,11 @@ import Link from "next/link";
 import { startTimer } from "@/app/(app)/actions";
 import { SubmitButton, Toast } from "@/components/client";
 import { projectColor } from "@/lib/colors";
-import type { Budget } from "@/lib/budget";
 import type { Health } from "@/lib/milestones";
 import type { ProjectStatus, TaskStatus, TimesheetStatus } from "@/lib/types";
 import { PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
+
+export { BudgetBar } from "@/components/budget-bar";
 
 export function Flash({ error, notice }: { error?: string; notice?: string }) {
   if (!error && !notice) return null;
@@ -71,34 +72,6 @@ const HEALTH: Record<Health["state"], { label: string; tone: string }> = {
   late: { label: "Late", tone: "bg-red-50 text-red-800" },
   done: { label: "Done", tone: "bg-stone-100 text-stone-600" },
 };
-
-const BUDGET_TONE = { none: "", ok: "bg-emerald-500", near: "bg-amber-500", over: "bg-red-600" };
-
-export function BudgetBar({ budget }: { budget: Budget }) {
-  const h = (n: number) => +n.toFixed(1);
-  if (budget.planned == null || budget.pct == null) {
-    return <span className="text-stone-400">No task estimates yet</span>;
-  }
-  const over = budget.logged - budget.planned;
-  return (
-    <span className="inline-flex items-center gap-2" title="Hours logged (not counting PTO) against the task estimates">
-      <span
-        role="progressbar"
-        aria-label="Budget used"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(Math.min(budget.pct, 100))}
-        className="relative inline-block h-2 w-28 overflow-hidden rounded-full bg-stone-200"
-      >
-        <span className={`absolute inset-y-0 left-0 ${BUDGET_TONE[budget.state]}`} style={{ width: `${Math.min(budget.pct, 100)}%` }} />
-      </span>
-      <span className={budget.state === "over" ? "font-medium text-red-700" : budget.state === "near" ? "font-medium text-amber-800" : ""}>
-        {h(budget.logged)} of {h(budget.planned)} h · {Math.round(budget.pct)}%
-        {budget.state === "over" && ` (${h(over)} h over)`}
-      </span>
-    </span>
-  );
-}
 
 export function HealthBadge({ health, showReason }: { health: Health; showReason?: boolean }) {
   const h = HEALTH[health.state];

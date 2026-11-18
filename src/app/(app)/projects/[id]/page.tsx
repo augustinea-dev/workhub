@@ -524,6 +524,13 @@ export default async function ProjectPage({
                   <label className="label" htmlFor="dropbox_url">Dropbox folder</label>
                   <input id="dropbox_url" name="dropbox_url" type="url" defaultValue={p.dropbox_url ?? ""} placeholder="Paste the folder link" className="input w-full" />
                 </div>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name="billable" defaultChecked={p.billable} className="mt-0.5" />
+                  <span>
+                    Billable
+                    <span className="block text-xs text-stone-500">Time on this project counts as billable. Changing this updates its logged time too.</span>
+                  </span>
+                </label>
                 <div className="flex items-center gap-2">
                   <SubmitButton>Save project</SubmitButton>
                   <Link href={here} className="btn">Cancel</Link>
@@ -558,6 +565,7 @@ export default async function ProjectPage({
                 </div>
               </div>
               {p.cost_code && <div><dt className="label">Cost code</dt><dd>{p.cost_code}</dd></div>}
+              <div><dt className="label">Billing</dt><dd>{p.billable ? "Billable" : "Internal, not billable"}</dd></div>
               <div>
                 <dt className="label">Dropbox folder</dt>
                 <dd>

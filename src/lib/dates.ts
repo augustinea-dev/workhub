@@ -20,11 +20,9 @@ export function addDays(iso: string, days: number): string {
   return toISO(d);
 }
 
-/** Monday of the week containing `iso`. */
+/** Sunday of the week containing `iso` (weeks run Sunday to Saturday, as in public.week_sunday). */
 export function weekStart(iso: string): string {
-  const d = parse(iso);
-  const dow = (d.getUTCDay() + 6) % 7; // Mon = 0
-  return addDays(iso, -dow);
+  return addDays(iso, -parse(iso).getUTCDay());
 }
 
 /** "Oct 28" for a date-only string. */

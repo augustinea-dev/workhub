@@ -44,6 +44,9 @@ src/lib/                    supabase clients, session (requireProfile / requireA
 | Take open work for a role (`take_role_task`) | ✓ | Only for roles they hold |
 | Comment | ✓ | ✓ |
 | Log time | ✓ | Own only |
+| Fill in the weekly timesheet grid (tasks + General Time) | Own and anyone's | Own only |
+| Manage General Time items | ✓ | ✗ (can read them) |
+| Set a project's Billable setting | ✓ | ✗ |
 | Start, stop or discard a timer | Own only | Own only |
 | Edit / remove time entries | Anyone's | Own only, and never in a submitted or approved week (admins must reopen it first) |
 | Submit / recall a week's timesheet | Own | Own |
@@ -64,10 +67,18 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 
 ## Database changes: important
 
-- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update, project_dropbox_link, dropbox_connection, time_entries_realtime, running_timers, budget_alerts, holidays).
+- The live migration history matches the files in `supabase/migrations` (init, admin_only_deletes, member_permissions, task_milestones, comment_mentions, project_templates, timesheets, subtasks, project_naming, task_assignees, job_roles, notification_preferences, teams, fix_reference_number_update, project_dropbox_link, dropbox_connection, time_entries_realtime, running_timers, budget_alerts, holidays, timesheet_grid).
 - **Never edit an existing migration.** Add a new file named `YYYYMMDDHHMMSS_description.sql`.
 - Test migrations locally before pushing. Postgres 16 with a small `auth` stub (an `auth.users` table, `auth.uid()` reading `request.jwt.claim.sub`, and an `authenticated` role) is enough. Test as both an admin and a member.
 - Apply to Supabase with `supabase db push` (CLI) or the GitHub integration. If you run SQL by hand in the dashboard, also insert the version into `supabase_migrations.schema_migrations` so history stays in sync.
+
+## Rollbacks
+
+- Risky changes get a git tag before they start and a matching undo script in `supabase/rollbacks/` (never in `migrations`, so the CLI doesn't run it).
+- Timesheet grid (`20261117211210_timesheet_grid`): the migration copies `time_entries`, `timesheets` and project clients into the `backup_timesheet_grid` schema first. To undo:
+  1. Run `supabase/rollbacks/20261117211210_timesheet_grid_down.sql` in the SQL editor as one script. It removes General Time entries, restores hour types and timesheets from the backup, puts weeks back to Monday and deletes the migration's history row.
+  2. Deploy the `before-timesheet-grid` git tag (or revert the branch's merge commit) so the app matches.
+  3. Once sure, `drop schema backup_timesheet_grid cascade;`.
 
 ## Conventions
 
@@ -85,10 +96,14 @@ When adding a feature, decide its admin/member rule first. Enforce it with an RL
 - Teams: `teams` (optional `manager_id`) and `team_members`. `manages(profile)` is true for an active team's manager; it widens timesheet reads and lets `decide_timesheet` / `reopen_timesheet` act for managers (never on their own week). Filters accept `team:<id>`. Mentioning "@Team name" mentions every member.
 - Notification settings: `notification_preferences` rows turn a kind off; trigger `skip_muted_notification` drops those notices. `timesheet_returned` isn't an allowed kind there, so it's always on.
 - Subtasks: `tasks.parent_task_id`, same project, one level deep (trigger `check_task_parent`; relax it there to allow more levels). A parent's start, due and estimate are rolled up from its subtasks by `apply_subtask_rollup` / `refresh_parent_rollup`, per field, only when at least one subtask has that value. Admin-only to create, like all tasks.
-- Timesheets: one row per person per Monday week in `timesheets`, changed only through `submit_timesheet()`, `recall_timesheet()`, `decide_timesheet()` and `reopen_timesheet()` (no direct write policies). A week can't be submitted below the person's `profiles.weekly_hours` (PTO counts). Trigger `guard_locked_week` blocks time entry changes in submitted or approved weeks for everyone.
+- Weeks run Sunday to Saturday everywhere: `week_sunday()` in SQL, `weekStart()` in `dates.ts`.
+- Time entries are on a project/task **or** a General Time item (`time_entries.category_id` to `time_categories`, check `time_entries_project_or_category`), never both. `hour_type` is set by trigger `time_entry_set_type` and never by the app: billable project = billable, internal project (`projects.billable` false) = non_billable, category kind work = admin (shown as Agency), time_off and holiday = pto (shown as Time off). Changing `projects.billable` rewrites its entries' type (`guard_locked_week` allows type-only updates in locked weeks). `job_role_id` defaults to the person's main role. Reports skip holiday-kind hours because holidays are already out of available hours.
+- The Time page grid (`src/components/timesheet-grid.tsx`) saves with `saveTimesheetWeek`: each cell sets that row and day's total (rows `t:<task>`, `p:<project>`, `c:<category>`), merging several entries into one. The one-entry form uses `logTime` with `work` = `p:<id>` or `c:<id>`.
+- Action redirects keep the page's query string (for example `?week=`), replacing only `error` / `notice`.
+- Timesheets: one row per person per Sunday week in `timesheets`, changed only through `submit_timesheet()`, `recall_timesheet()`, `decide_timesheet()` and `reopen_timesheet()` (no direct write policies). A week can't be submitted below the person's `profiles.weekly_hours` (time off and holiday hours count). Trigger `guard_locked_week` blocks time entry changes in submitted or approved weeks for everyone.
 - `docs/roles-guide.md` lists what Admins and Users can do, feature by feature, in plain language for the future onboarding doc. Update it whenever a feature lands or a permission changes.
 - Reports: `/reports` (requireAdmin) and `/export/utilization` (403 for Users), views by person, job role (main role) and project, with total, week or month breakdown. All maths is in `src/lib/utilization.ts`: available = weekly hours ÷ 5 × working days (holidays out) − PTO; planned = each leaf task's estimate split evenly among its assignees and open role slots and over the working days from start to due (one date only: that day; no dates: listed as Unscheduled). No RLS change: Admins can already read all tasks and time.
-- Budget alerts: `check_project_budget()` runs from triggers on `time_entries` and `tasks`, compares non-PTO hours with the sum of top-level task estimates, and sends one `budget_alert` notice (the highest newly passed level) to active Admins and the project owner. Levels sent are kept in `project_budget_alerts` (no policies) and cleared when the project drops below them. The budget bar's maths is in `src/lib/budget.ts`; keep the two in step.
+- Budget alerts: `check_project_budget()` runs from triggers on `time_entries` and `tasks`, compares non-PTO hours with the sum of top-level task estimates, and sends one `budget_alert` notice (the highest newly passed level) to active Admins and the project owner. Levels sent are kept in `project_budget_alerts` (no policies) and cleared when the project drops below them. The budget bar (`src/components/budget-bar.tsx`, on the project page and each project heading in the timesheet grid, where unsaved cells count toward it) uses the maths in `src/lib/budget.ts`; keep that and the SQL in step.
 - Timer: `running_timers`, one row per person (primary key `user_id`), readable and writable only by its owner. Started with `startTimer`, logged with `logTimer` (inserts a normal time entry, then deletes the timer) or dropped with `discardTimer`; `/timer` is the stop page. `getMyTimer()` in `src/lib/timer.ts`.
 - Milestones are tasks with `is_milestone`; other tasks join one through `milestone_id` (same project, enforced by trigger). Health (on track / at risk / late) is computed in `src/lib/milestones.ts`.
 

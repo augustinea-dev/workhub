@@ -45,14 +45,14 @@ export function resolveRange(
   toParam: string | undefined,
   today: string,
 ): { preset: RangePreset; from: string; to: string } {
-  const monday = weekStart(today);
+  const sunday = weekStart(today);
   switch (preset) {
     case "this_week":
-      return { preset, from: monday, to: addDays(monday, 6) };
+      return { preset, from: sunday, to: addDays(sunday, 6) };
     case "last_week":
-      return { preset, from: addDays(monday, -7), to: addDays(monday, -1) };
+      return { preset, from: addDays(sunday, -7), to: addDays(sunday, -1) };
     case "next_week":
-      return { preset, from: addDays(monday, 7), to: addDays(monday, 13) };
+      return { preset, from: addDays(sunday, 7), to: addDays(sunday, 13) };
     case "this_month":
       return { preset, from: monthStart(today), to: monthEnd(today) };
     case "next_month": {
@@ -112,7 +112,7 @@ async function pages<T>(build: (start: number, end: number) => PromiseLike<{ dat
   }
 }
 
-type Entry = { user_id: string; project_id: string; work_date: string; hours: number | string; hour_type: HourType };
+type Entry = { user_id: string; project_id: string | null; work_date: string; hours: number | string; hour_type: HourType; category: { kind: string } | null };
 type PlanTask = {
   id: string;
   title: string;
@@ -133,7 +133,7 @@ export async function loadReportData(from: string, to: string) {
     pages<Entry>((a, b) =>
       supabase
         .from("time_entries")
-        .select("user_id, project_id, work_date, hours, hour_type")
+        .select("user_id, project_id, work_date, hours, hour_type, category:time_categories(kind)")
         .gte("work_date", from)
         .lte("work_date", to)
         .order("id")
@@ -222,13 +222,14 @@ export function buildReport(opts: {
   for (const e of data.entries) {
     const key = periodOf(e.work_date);
     if (!key) continue;
+    if (e.category?.kind === "holiday") continue;
     const h = Number(e.hours);
     const c = cellFor(e.user_id, key);
     if (e.hour_type === "pto") c.pto += h;
     else {
       c.worked += h;
       if (e.hour_type === "billable") c.billable += h;
-      if (inTeam(e.user_id)) {
+      if (inTeam(e.user_id) && e.project_id) {
         const pw = projectWorked.get(e.project_id) ?? { worked: 0, billable: 0 };
         pw.worked += h;
         if (e.hour_type === "billable") pw.billable += h;

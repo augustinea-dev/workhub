@@ -1,9 +1,10 @@
-import { addHoliday, connectDropbox, deleteHoliday, disconnectDropbox, saveJobRole, saveProjectType, saveTeam, updateMember, updateNextReference } from "../actions";
+import { TIME_CATEGORY_KINDS } from "@/lib/types";
+import { addHoliday, connectDropbox, deleteHoliday, disconnectDropbox, saveJobRole, saveTimeCategory, saveProjectType, saveTeam, updateMember, updateNextReference } from "../actions";
 import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { Flash, PageHeader } from "@/components/ui";
 import { addWorkingDays, formatDate, formatTimestamp, todayISO } from "@/lib/dates";
 import { dropboxStatus } from "@/lib/dropbox";
-import { getHolidays, getJobRoles, getNextReference, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
+import { getHolidays, getJobRoles, getNextReference, getTimeCategories, getPeople, getProjectTypes, getTeams, nameOf, personOption, sp } from "@/lib/data";
 import { AssigneePicker } from "@/components/assignee-picker";
 import { pickerOptions } from "@/lib/assignees";
 import { requireAdmin } from "@/lib/session";
@@ -33,7 +34,7 @@ export default async function AdminPage({
     getJobRoles(),
     dropboxStatus(),
   ]);
-  const [teams, holidays] = await Promise.all([getTeams(), getHolidays()]);
+  const [teams, holidays, categories] = await Promise.all([getTeams(), getHolidays(), getTimeCategories()]);
   const today = todayISO();
   const holidayGroups: { name: string; from: string; to: string; ids: string[] }[] = [];
   for (const h of holidays.filter((x) => x.day >= today.slice(0, 4) + "-01-01")) {
@@ -263,6 +264,49 @@ export default async function AdminPage({
               <input id="hol_name" name="name" required placeholder="e.g. Thanksgiving" className="input w-56 py-1.5" />
             </div>
             <SubmitButton className="btn py-1.5" pendingText="Adding…">Add holiday</SubmitButton>
+          </form>
+        </div>
+      </section>
+
+      <section id="general-time" className="card mb-6 overflow-x-auto">
+        <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">General Time</h2>
+        <div className="space-y-2 px-4 py-3">
+          <p className="mb-1 text-xs text-stone-500">
+            Timesheet rows that aren&apos;t on a project. Agency work counts as worked but never billable; Time off and Holiday count toward
+            the weekly hours but not as work. Untick Active to hide an item from timesheets; its logged time is kept.
+          </p>
+          {categories.map((c) => (
+            <form key={c.id} action={saveTimeCategory} className="flex flex-wrap items-center gap-2">
+              <input type="hidden" name="id" value={c.id} />
+              <select name="group_name" defaultValue={c.group_name} aria-label={`Group for ${c.name}`} className="input w-32 py-1.5">
+                <option value="Agency">Agency</option>
+                <option value="Non-Client">Non-Client</option>
+              </select>
+              <input name="name" required defaultValue={c.name} aria-label={`Name for ${c.name}`} className="input w-56 py-1.5" />
+              <select name="kind" defaultValue={c.kind} aria-label={`Counts as, for ${c.name}`} className="input w-52 py-1.5">
+                {TIME_CATEGORY_KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>{k.label}</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-1 text-sm">
+                <input type="checkbox" name="active" value="on" defaultChecked={c.active} /> Active
+              </label>
+              <SubmitButton className="btn py-1.5">Save</SubmitButton>
+            </form>
+          ))}
+          <form action={saveTimeCategory} className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
+            <input type="hidden" name="active" value="on" />
+            <select name="group_name" defaultValue="Agency" aria-label="Group for new item" className="input w-32 py-1.5">
+              <option value="Agency">Agency</option>
+              <option value="Non-Client">Non-Client</option>
+            </select>
+            <input name="name" required placeholder="New item, e.g. New Business" aria-label="New item name" className="input w-56 py-1.5" />
+            <select name="kind" defaultValue="work" aria-label="Counts as, for new item" className="input w-52 py-1.5">
+              {TIME_CATEGORY_KINDS.map((k) => (
+                <option key={k.value} value={k.value}>{k.label}</option>
+              ))}
+            </select>
+            <SubmitButton className="btn py-1.5" pendingText="Adding…">Add item</SubmitButton>
           </form>
         </div>
       </section>

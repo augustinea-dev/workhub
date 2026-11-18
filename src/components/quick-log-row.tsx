@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { logTime } from "@/app/(app)/actions";
 import { SubmitButton } from "@/components/client";
-import { HOUR_TYPES } from "@/lib/types";
 
 /** A task row with a "Log time" button that opens a small form underneath it. */
 export function QuickLogRow({
@@ -70,14 +69,6 @@ export function QuickLogRow({
                   autoFocus
                   className="input w-full"
                 />
-              </div>
-              <div className="w-36">
-                <label className="label" htmlFor={`ql_type_${taskId}`}>Type</label>
-                <select id={`ql_type_${taskId}`} name="hour_type" defaultValue="billable" className="input w-full">
-                  {HOUR_TYPES.map((h) => (
-                    <option key={h.value} value={h.value}>{h.label}</option>
-                  ))}
-                </select>
               </div>
               <div className="min-w-48 flex-1">
                 <label className="label" htmlFor={`ql_note_${taskId}`}>Note</label>

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const header = ["Group", "Person", "Period start", "Period end", "Available", "Planned", "Open role hours", "Worked", "Billable", "PTO", "Planned util %", "Actual util %", "Billable util %"];
+  const header = ["Group", "Person", "Period start", "Period end", "Available", "Planned", "Open role hours", "Worked", "Billable", "Time off", "Planned util %", "Actual util %", "Billable util %"];
   const line = (group: string, person: string, from: string, to: string, c: Cell, openHours = 0) => [
     group,
     person,

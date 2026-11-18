@@ -15,7 +15,7 @@ import { groupByMilestone } from "@/lib/milestones";
 import { canChangeStatus } from "@/lib/permissions";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { HOUR_TYPES, TASK_STATUSES, type Comment, type Profile, type Task, type TaskStatus, type TimeEntry } from "@/lib/types";
+import { TASK_STATUSES, type Comment, type Profile, type Task, type TaskStatus, type TimeEntry } from "@/lib/types";
 
 type Subtask = { id: string; title: string; status: TaskStatus; assignee_ids: string[]; due_date: string | null };
 type Raw<T> = Omit<T, "assignee_ids" | "open_roles"> & {
@@ -497,11 +497,6 @@ export default async function TaskPage({
                 <input type="hidden" name="redirect_to" value={here} />
                 <input name="work_date" type="date" defaultValue={today} aria-label="Date" className="input w-40" />
                 <input name="hours" type="number" step="0.25" min="0.25" max="24" required placeholder="Hours" aria-label="Hours" className="input w-24" />
-                <select name="hour_type" defaultValue="billable" aria-label="Hour type" className="input w-36">
-                  {HOUR_TYPES.map((h) => (
-                    <option key={h.value} value={h.value}>{h.label}</option>
-                  ))}
-                </select>
                 <input name="note" placeholder="Note (optional)" aria-label="Note" className="input min-w-48 flex-1" />
                 <SubmitButton pendingText="Logging…" className="btn-primary shrink-0">Log time</SubmitButton>
               </div>

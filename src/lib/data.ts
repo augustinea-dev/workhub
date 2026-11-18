@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { Company, JobRole, Profile, ProjectType, Team } from "@/lib/types";
+import type { Company, JobRole, Profile, ProjectType, Team, TimeCategory } from "@/lib/types";
 
 export const getPeople = cache(async (): Promise<Profile[]> => {
   const supabase = await createClient();
@@ -55,6 +55,12 @@ export const getNextReference = cache(async (): Promise<number | null> => {
   const supabase = await createClient();
   const { data } = await supabase.from("workhub_settings").select("next_reference_number").maybeSingle();
   return data ? Number(data.next_reference_number) : null;
+});
+
+export const getTimeCategories = cache(async (): Promise<TimeCategory[]> => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("time_categories").select("*").order("group_name").order("sort_order").order("name");
+  return (data ?? []) as TimeCategory[];
 });
 
 export const getProjectOptions = cache(async (): Promise<{ id: string; name: string }[]> => {

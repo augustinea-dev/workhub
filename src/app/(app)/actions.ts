@@ -10,7 +10,7 @@ import { getPeople, getTeams } from "@/lib/data";
 import { addDays, daysBetween, isValidISODate, isWorkingDay } from "@/lib/dates";
 import { authorizeUrl, createProjectFolder, dropboxStatus, removeConnection } from "@/lib/dropbox";
 import { dropboxRedirectUri } from "@/lib/dropbox-redirect";
-import { HOUR_TYPES, NOTIFICATION_KINDS, PROJECT_STATUSES, TASK_STATUSES } from "@/lib/types";
+import { NOTIFICATION_KINDS, PROJECT_STATUSES, TASK_STATUSES, TIME_CATEGORY_KINDS } from "@/lib/types";
 
 const CONFLICT =
   "Someone else changed this since you opened it. Their version is shown below — make your change again.";
@@ -34,15 +34,20 @@ function safePath(p: string, fallback: string): string {
   return p.startsWith("/") && !p.startsWith("//") ? p : fallback;
 }
 function withParam(path: string, key: "error" | "notice", msg: string): string {
-  const [base] = path.split("?");
-  return `${base}?${key}=${encodeURIComponent(msg)}`;
+  const [rest, hash] = path.split("#");
+  const [base, query] = rest.split("?");
+  const params = new URLSearchParams(query);
+  params.delete("error");
+  params.delete("notice");
+  params.set(key, msg);
+  return `${base}?${params}${hash ? `#${hash}` : ""}`;
 }
 function fail(path: string, msg: string): never {
   redirect(withParam(path, "error", msg));
 }
 function done(path: string, msg?: string): never {
   revalidatePath("/", "layout");
-  redirect(msg ? withParam(path, "notice", msg) : path.split("?")[0]);
+  redirect(msg ? withParam(path, "notice", msg) : path);
 }
 function dropboxUrl(fd: FormData, path: string): string | null {
   const v = str(fd, "dropbox_url");
@@ -220,6 +225,23 @@ export async function addHoliday(fd: FormData) {
   done(back, `Added ${name} (${fresh.length} ${fresh.length === 1 ? "day" : "days"}).${skipped}`);
 }
 
+export async function saveTimeCategory(fd: FormData) {
+  await requireAdmin();
+  const back = "/admin#general-time";
+  const name = str(fd, "name");
+  const group_name = str(fd, "group_name") === "Non-Client" ? "Non-Client" : "Agency";
+  const kind = oneOf(str(fd, "kind"), TIME_CATEGORY_KINDS, "work");
+  if (!name) fail(back, "Give the item a name.");
+  const row = { name, group_name, kind, active: str(fd, "active") === "on" };
+  const supabase = await createClient();
+  const id = str(fd, "id");
+  const { error } = id
+    ? await supabase.from("time_categories").update(row).eq("id", id)
+    : await supabase.from("time_categories").insert({ ...row, sort_order: 100 });
+  if (error) fail(back, error.code === "23505" ? `${name} already exists.` : error.message);
+  done(back, `Saved ${group_name}: ${name}.`);
+}
+
 export async function deleteHoliday(fd: FormData) {
   await requireAdmin();
   const ids = fd.getAll("id").filter((v): v is string => typeof v === "string" && !!v);
@@ -339,6 +361,7 @@ export async function createProject(fd: FormData) {
       start_date: optDate(fd, "start_date"),
       due_date: optDate(fd, "due_date"),
       status: "active",
+      billable: str(fd, "billable") === "on",
     })
     .select("id")
     .single();
@@ -363,7 +386,10 @@ async function createProjectFromTemplate(fd: FormData, ownerFallback: string) {
     p_due: optDate(fd, "due_date"),
   });
   if (error || !data) fail("/projects", error?.message ?? "Couldn't create the project.");
-  const { error: namingError } = await supabase.from("projects").update({ ...naming, dropbox_url }).eq("id", data);
+  const { error: namingError } = await supabase
+    .from("projects")
+    .update({ ...naming, dropbox_url, billable: str(fd, "billable") === "on" })
+    .eq("id", data);
   if (namingError) fail(`/projects/${data}`, `Project created, but its name couldn't be set: ${namingError.message}`);
   const folderError = dropbox_url ? null : await linkDropboxFolder(data);
   if (folderError) fail(`/projects/${data}`, `Project created, but the Dropbox folder couldn't be made: ${folderError}`);
@@ -408,6 +434,7 @@ export async function updateProject(fd: FormData) {
       due_date: optDate(fd, "due_date"),
       description: opt(fd, "description"),
       dropbox_url,
+      billable: str(fd, "billable") === "on",
     })
     .eq("id", id)
     .eq("version", int(fd, "version"))
@@ -740,9 +767,11 @@ export async function logTime(fd: FormData) {
   const back = safePath(str(fd, "redirect_to"), "/time");
   const hours = Number.parseFloat(str(fd, "hours"));
   if (!Number.isFinite(hours) || hours <= 0 || hours > 24) fail(back, "Hours must be between 0 and 24.");
+  const work = str(fd, "work");
   const taskId = opt(fd, "task_id");
-  const projectId = opt(fd, "project_id");
-  if (!taskId && !projectId) fail(back, "Pick a project or task.");
+  const projectId = opt(fd, "project_id") ?? (work.startsWith("p:") ? work.slice(2) : null);
+  const categoryId = work.startsWith("c:") ? work.slice(2) : null;
+  if (!taskId && !projectId && !categoryId) fail(back, "Pick a project or a General Time item.");
   const supabase = await createClient();
 
   let resolvedProject = projectId;
@@ -751,16 +780,100 @@ export async function logTime(fd: FormData) {
     resolvedProject = t?.project_id ?? projectId;
   }
   const { error } = await supabase.from("time_entries").insert({
-    task_id: taskId,
-    project_id: resolvedProject,
+    task_id: categoryId ? null : taskId,
+    project_id: categoryId ? null : resolvedProject,
+    category_id: categoryId,
     user_id: me.id,
     work_date: optDate(fd, "work_date") ?? undefined,
     hours,
-    hour_type: oneOf(str(fd, "hour_type"), HOUR_TYPES, "billable"),
     note: opt(fd, "note"),
   });
   if (error) fail(back, error.message);
   done(back, `Logged ${hours} h.`);
+}
+
+type GridEntry = { id: string; task_id: string | null; project_id: string | null; category_id: string | null; work_date: string; hours: number; note: string | null; job_role_id: string | null };
+
+export async function saveTimesheetWeek(fd: FormData) {
+  const me = await requireProfile();
+  const userId = str(fd, "user_id") || me.id;
+  const week = optDate(fd, "week");
+  const back = safePath(str(fd, "redirect_to"), "/time");
+  if (!week) fail(back, "Pick a week.");
+  if (userId !== me.id && me.role !== "admin") fail(back, "You can only fill in your own timesheet.");
+  const end = addDays(week, 6);
+  const supabase = await createClient();
+
+  const { data: sheet } = await supabase.from("timesheets").select("status").eq("user_id", userId).eq("week_start", week).maybeSingle();
+  if (sheet && (sheet.status === "submitted" || sheet.status === "approved")) {
+    fail(back, "This week is submitted or approved, so it's locked. Recall it, or ask an admin to reopen it.");
+  }
+
+  const { data: rows, error: loadError } = await supabase
+    .from("time_entries")
+    .select("id, task_id, project_id, category_id, work_date, hours, note, job_role_id")
+    .eq("user_id", userId)
+    .gte("work_date", week)
+    .lte("work_date", end);
+  if (loadError) fail(back, loadError.message);
+  const existing = (rows ?? []) as GridEntry[];
+  const keyOf = (e: GridEntry) => (e.category_id ? `c:${e.category_id}` : e.task_id ? `t:${e.task_id}` : `p:${e.project_id}`);
+
+  const target = (key: string) =>
+    key.startsWith("c:")
+      ? { category_id: key.slice(2), task_id: null, project_id: null }
+      : key.startsWith("t:")
+        ? { task_id: key.slice(2), category_id: null }
+        : { project_id: key.slice(2), task_id: null, category_id: null };
+
+  const inserts: Record<string, unknown>[] = [];
+  const updates: { id: string; patch: Record<string, unknown> }[] = [];
+  const deletes: string[] = [];
+  let changed = 0;
+
+  for (const [field, raw] of fd.entries()) {
+    if (typeof raw !== "string" || !field.startsWith("h|")) continue;
+    const [, key, day] = field.split("|");
+    if (!key || !day || !isValidISODate(day) || day < week || day > end) continue;
+    if (!/^[tpc]:[0-9a-f-]{36}$/.test(key)) continue;
+    const hours = raw.trim() === "" ? 0 : Math.round(Number.parseFloat(raw) * 100) / 100;
+    if (!Number.isFinite(hours) || hours < 0 || hours > 24) fail(back, "Each day's hours must be between 0 and 24.");
+    const noteField = fd.get(`n|${key}|${day}`);
+    const note = typeof noteField === "string" ? noteField.trim() || null : undefined;
+    const roleField = fd.get(`r|${key}`);
+    const role = typeof roleField === "string" ? roleField || null : undefined;
+    const cell = existing.filter((e) => keyOf(e) === key && e.work_date === day);
+    const sum = cell.reduce((t, e) => t + Number(e.hours), 0);
+    const sameNote = note === undefined || (cell.length === 1 ? (cell[0].note ?? null) === note : cell.length === 0 && note === null);
+    const sameRole = role === undefined || key.startsWith("c:") || cell.every((e) => e.job_role_id === role);
+    if (Math.abs(sum - hours) < 0.001 && sameNote && sameRole) continue;
+    changed++;
+    const roleValue = key.startsWith("c:") ? {} : role !== undefined ? { job_role_id: role } : {};
+    if (hours === 0) {
+      deletes.push(...cell.map((e) => e.id));
+    } else if (cell.length === 1) {
+      updates.push({ id: cell[0].id, patch: { hours, ...(note !== undefined ? { note } : {}), ...roleValue } });
+    } else {
+      deletes.push(...cell.map((e) => e.id));
+      const merged = note !== undefined ? note : cell.map((e) => e.note).filter(Boolean).join("; ") || null;
+      inserts.push({ user_id: userId, work_date: day, hours, note: merged, ...target(key), ...roleValue });
+    }
+  }
+
+  if (!changed) done(back, "Nothing to save.");
+  if (deletes.length) {
+    const { error } = await supabase.from("time_entries").delete().in("id", deletes);
+    if (error) fail(back, error.message);
+  }
+  for (const u of updates) {
+    const { error } = await supabase.from("time_entries").update(u.patch).eq("id", u.id);
+    if (error) fail(back, error.message);
+  }
+  if (inserts.length) {
+    const { error } = await supabase.from("time_entries").insert(inserts);
+    if (error) fail(back, error.message);
+  }
+  done(back, `Saved the week (${changed} ${changed === 1 ? "change" : "changes"}).`);
 }
 
 export async function startTimer(fd: FormData) {
@@ -793,7 +906,6 @@ export async function logTimer(fd: FormData) {
     user_id: me.id,
     work_date: optDate(fd, "work_date") ?? undefined,
     hours,
-    hour_type: oneOf(str(fd, "hour_type"), HOUR_TYPES, "billable"),
     note: opt(fd, "note"),
   });
   if (error) fail(back, error.message);
@@ -824,7 +936,6 @@ export async function updateTime(fd: FormData) {
     .update({
       work_date: workDate,
       hours,
-      hour_type: oneOf(str(fd, "hour_type"), HOUR_TYPES, "billable"),
       note: opt(fd, "note"),
     })
     .eq("id", str(fd, "id"))

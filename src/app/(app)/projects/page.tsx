@@ -123,6 +123,13 @@ export default async function ProjectsPage({
               <label className="label" htmlFor="dropbox_url">Dropbox folder</label>
               <input id="dropbox_url" name="dropbox_url" type="url" placeholder="Optional, paste the folder link" className="input w-full" />
             </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="billable" defaultChecked className="mt-0.5" />
+              <span>
+                Billable
+                <span className="block text-xs text-stone-500">Time logged on this project counts as billable. Untick for internal projects.</span>
+              </span>
+            </label>
             {templates.length > 0 && (
               <div>
                 <label className="label" htmlFor="template_id">Start from template</label>

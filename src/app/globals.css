@@ -70,3 +70,13 @@ select:not([multiple]).text-xs {
   background-size: 0.875rem 0.875rem;
   padding-right: 1.75rem;
 }
+
+.no-spin::-webkit-inner-spin-button,
+.no-spin::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spin {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

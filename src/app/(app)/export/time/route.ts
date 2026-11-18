@@ -14,6 +14,7 @@ type Row = {
   note: string | null;
   project: { name: string; company: { name: string } | null } | null;
   task: { title: string } | null;
+  category: { name: string; group_name: string } | null;
 };
 
 const MAX_DAYS = 366;
@@ -21,9 +22,9 @@ const MAX_DAYS = 366;
 export async function GET(request: NextRequest) {
   const me = await requireProfile();
   const q = request.nextUrl.searchParams;
-  const thisMonday = weekStart(todayISO());
+  const thisWeek = weekStart(todayISO());
   const fromParam = q.get("from") ?? "";
-  const from = isValidISODate(fromParam) ? fromParam : thisMonday;
+  const from = isValidISODate(fromParam) ? fromParam : thisWeek;
   const toParam = q.get("to") ?? "";
   const to = isValidISODate(toParam) && toParam >= from ? toParam : addDays(from, 6);
   if (daysBetween(from, to) > MAX_DAYS) {
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   let query = supabase
     .from("time_entries")
-    .select("user_id, work_date, hours, hour_type, note, project:projects(name, company:companies(name)), task:tasks(title)")
+    .select("user_id, work_date, hours, hour_type, note, project:projects(name, company:companies(name)), task:tasks(title), category:time_categories(name, group_name)")
     .gte("work_date", from)
     .lte("work_date", to)
     .order("work_date")
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
     r.project?.company?.name ?? "",
     r.project?.name ?? "",
     r.task?.title ?? "",
+    r.category ? `${r.category.group_name}: ${r.category.name}` : "",
     Number(r.hours),
     HOUR_TYPES.find((h) => h.value === r.hour_type)?.label ?? r.hour_type,
     r.hour_type === "billable" ? "Yes" : "No",
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
   const who = userId === "all" ? "everyone" : slug(nameOf(people, userId));
   return csvResponse(
     `workhub-time-${who}-${from}-to-${to}.csv`,
-    ["Date", "Person", "Client", "Project", "Task", "Hours", "Hour type", "Billable", "Note", "Timesheet"],
+    ["Date", "Person", "Client", "Project", "Task", "General Time", "Hours", "Hour type", "Billable", "Note", "Timesheet"],
     rows,
   );
 }

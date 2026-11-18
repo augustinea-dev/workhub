@@ -55,7 +55,7 @@ export default async function MyWorkPage({
   const me = await requireProfile();
   const supabase = await createClient();
   const today = todayISO();
-  const monday = weekStart(today);
+  const sunday = weekStart(today);
 
   const isAdmin = me.role === "admin";
   let reviewQuery = supabase
@@ -80,8 +80,8 @@ export default async function MyWorkPage({
       .from("time_entries")
       .select("hours")
       .eq("user_id", me.id)
-      .gte("work_date", monday)
-      .lte("work_date", addDays(monday, 6)),
+      .gte("work_date", sunday)
+      .lte("work_date", addDays(sunday, 6)),
     supabase.from("profile_job_roles").select("role_id").eq("profile_id", me.id),
     getJobRoles(),
     reviewQuery,
@@ -118,7 +118,7 @@ export default async function MyWorkPage({
     ...new Map(mine.filter((t) => t.project?.company).map((t) => [t.project!.company!.id, t.project!.company!.name])).entries(),
   ].sort((a, b) => a[1].localeCompare(b[1]));
   const weekHours = (hours ?? []).reduce((s, h) => s + Number(h.hours), 0);
-  const endOfWeek = addDays(monday, 6);
+  const endOfWeek = addDays(sunday, 6);
 
   const groups = [
     { label: "Overdue", items: rows.filter((t) => t.due_date && t.due_date < today), tone: "text-red-700" },

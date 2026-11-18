@@ -31,7 +31,7 @@ Filters live in the page address, so a filtered view can be bookmarked or shared
 
 **Where:** My Work in the sidebar.
 
-- **Everyone:** see your open tasks, grouped into Overdue, Due this week, Later and No due date. Change a task's status from the list. The "Logged this week" card shows your hours for Monday to Sunday and links to the Time page.
+- **Everyone:** see your open tasks, grouped into Overdue, Due this week, Later and No due date. Change a task's status from the list. The "Logged this week" card shows your hours for Sunday to Saturday and links to the Time page.
 - **Waiting on review:** a list of tasks in the "In review" status, with the people on each task, its due date and a link to the project's Dropbox folder. It only appears when there's something to review.
   - **Admins:** see every task in review, on all projects, and can change their status.
   - **Users:** see tasks in review on projects they own. They can change the status only of tasks they're assigned to; the others show the status as a badge.
@@ -74,7 +74,7 @@ Every project name is built from its parts, the same way as in Workfront: **refe
 - **Admins only:**
   - Change the status of any task.
   - **Add a task:** title, assignees, start, due, estimate (hours), milestone, and whether the task is itself a milestone.
-  - **Edit project** (in the Project details card): name parts, status, owner, client, dates, cost code, description and Dropbox folder link. Save as template and Delete are in the edit view too.
+  - **Edit project** (in the Project details card): name parts, status, owner, client, dates, cost code, description, Dropbox folder link and **Billable** (untick for internal projects; the project's logged time switches with it). Save as template and Delete are in the edit view too.
   - **Save as template:** copies the project's top-level tasks (subtasks are skipped), milestones, estimates and assignees into a new template.
   - Delete the project and its tasks.
   - **Create Dropbox folder** (in Project details) for a project with no folder link yet, once Dropbox is connected.
@@ -164,12 +164,16 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 
 ## Logging time
 
-**Quick log on My Work:** every task row has a **Log time** button. It opens a small form under the row (date, hours, type, note) and logs it without leaving My Work. Dates in the future can't be picked there.
+**Quick log on My Work:** every task row has a **Log time** button. It opens a small form under the row (date, hours, note) and logs it without leaving My Work. Dates in the future can't be picked there.
 
-**Where:** a task's Time section, or the Time page (for project-level time).
+**Where:** the timesheet grid on the Time page, **Log one entry** on the Time page (a project or a General Time item), a task's Time section, My Work, or the timer.
 
+- **Billable is automatic.** Nobody picks a type:
+  - Time on a billable project shows as Billable; time on an internal project as Non-billable.
+  - **General Time: Agency** items (General Time, IT Tasks, Management Time, Traffic, Training & Conferences, Visioneer Liftoff Meeting) show as Agency: worked, never billable.
+  - **General Time: Non-Client** items (Vacation, Sick Leave, Holiday and the rest) show as Time off.
 - **Everyone:**
-  - Log hours in 15-minute steps with a date, hour type (Billable, Non-billable, Admin, Meeting, PTO) and optional note.
+  - Log hours in 15-minute steps with a date and an optional note.
   - Edit or remove your own entries, unless that week's timesheet is submitted or approved.
 - **Admins only:** edit or remove anyone's entries (same lock applies), and view anyone's week on the Time page.
 - **Team managers:** can view their team members' weeks on the Time page (pick them under Person).
@@ -188,11 +192,21 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 
 ## Timesheets
 
-**Where:** the Time page. Weeks run Monday to Sunday (Pacific time).
+**Where:** the Time page. Weeks run Sunday to Saturday (Pacific time), as in Workfront.
 
 - **Everyone:**
+  - **The grid:** one row per task, grouped by project, then the General Time rows (Agency, then Non-Client). Columns are Sunday to Saturday, with totals per row and per day. Type hours into the cells and select **Save week**.
+    - Task rows: every open task you're assigned to, anything you logged time on that week, and **Add a task** for any other open task.
+    - **Job role** per task row, starting from your main role.
+    - Each project's heading shows its **budget bar** (everyone's hours against the task estimates, the same as on the project page). Hours you type count toward it right away, marked "unsaved" until you save, so you can see if the week puts the project over. Projects without estimates show no bar.
+    - To add a note, hover an hours box and select the pencil in its corner, or press Enter in the box. The note opens right next to the box; Enter or **Done** closes it, and it's saved with the week. Boxes with a note show a blue pencil, and hovering it shows the note.
+    - **Save week** and **Add a task** stay pinned to the bottom of the screen on a long sheet.
+    - Changing a cell sets that day's total for the row. If the day had several entries (from the timer, say), they become one, keeping their notes.
+    - Holidays from the Admin page are shaded, and their **Holiday** hours are filled in (your daily hours). Save the week to keep them.
+    - You're warned before leaving the page with unsaved edits.
+  - **Log one entry** under the grid still adds a single entry the old way.
   - The **Timesheet** panel shows the week's status: Open, Submitted, Approved or Returned.
-  - **Submit week** once you've logged at least your hours per week (40 unless an Admin set something else). PTO counts. Weeks that haven't started can't be submitted.
+  - **Submit for approval** once you've saved at least your hours per week (40 unless an Admin set something else). Time off and Holiday count. Weeks that haven't started can't be submitted, but you can fill in time off ahead.
   - Submitted and approved weeks are **locked**: no adding, editing or removing time.
   - **Recall to edit** a submitted week until an Admin decides.
   - A **returned** week shows the Admin's note. Fix it and submit again.
@@ -273,6 +287,7 @@ Files open in Excel or Google Sheets.
 
 - **People:** edit name, roles (with a main role), hours per week, access (Admin or User) and Active. You can't remove your own admin access.
 - **Job roles:** the list of roles people can hold and tasks can ask for.
+- **General Time:** the timesheet rows that aren't on a project, in two groups (Agency and Non-Client). Each counts as Agency work (worked, never billable), Time off or Holiday. Rename, regroup or untick Active to hide one; logged time is kept.
 - **Holidays:** days the agency is closed. Add one day, or a From and To range such as Thanksgiving, Nov 25 to Nov 27 (weekends are skipped, days already on the list are left as they are). A range shows as one line and is removed in one click. Template dates skip them, and Reports leave them out of available and planned hours. Adding one doesn't move dates on existing projects. Everyone can see holidays; only Admins add or remove them.
 - **Project names:** the next reference number, and the list of project types.
 - **Dropbox:** connect Workhub to Dropbox once for the agency. After that, each new project gets a folder (client, then project name) and its link fills in automatically. If a folder can't be made, the project is still created and you see why. Disconnect stops new folders; existing links keep working.

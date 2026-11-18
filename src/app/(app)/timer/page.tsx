@@ -6,7 +6,6 @@ import { sp } from "@/lib/data";
 import { dateOf, formatTimestamp, todayISO } from "@/lib/dates";
 import { requireProfile } from "@/lib/session";
 import { elapsedHours, getMyTimer, LONG_TIMER_HOURS, roundedHours } from "@/lib/timer";
-import { HOUR_TYPES } from "@/lib/types";
 
 export default async function TimerPage({
   searchParams,
@@ -55,7 +54,7 @@ export default async function TimerPage({
             This timer ran for more than {LONG_TIMER_HOURS} hours. It may have been left on by mistake, so check the hours before logging.
           </p>
         )}
-        <form action={logTimer} className="grid gap-3 p-4 sm:grid-cols-3">
+        <form action={logTimer} className="grid gap-3 p-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="timer_date">Date</label>
             <input id="timer_date" name="work_date" type="date" defaultValue={dateOf(timer.started_at)} max={todayISO()} className="input w-full" />
@@ -64,19 +63,11 @@ export default async function TimerPage({
             <label className="label" htmlFor="timer_hours">Hours</label>
             <input id="timer_hours" name="hours" type="number" step="0.25" min="0.25" max="24" required defaultValue={hours} className="input w-full" />
           </div>
-          <div>
-            <label className="label" htmlFor="timer_type">Type</label>
-            <select id="timer_type" name="hour_type" defaultValue="billable" className="input w-full">
-              {HOUR_TYPES.map((h) => (
-                <option key={h.value} value={h.value}>{h.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-2">
             <label className="label" htmlFor="timer_note">Note</label>
             <input id="timer_note" name="note" placeholder={`What you did on ${timer.task.title}`} className="input w-full" />
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
             <p className="text-xs text-stone-500">Hours are rounded to the nearest quarter hour.</p>
             <SubmitButton pendingText="Logging…">Log time and stop</SubmitButton>
           </div>

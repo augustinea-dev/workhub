@@ -44,6 +44,7 @@ export type Project = {
   project_type: string | null;
   cost_code: string | null;
   dropbox_url: string | null;
+  billable: boolean;
   name_locked: boolean;
   version: number;
   updated_at: string;
@@ -120,9 +121,17 @@ export const PROJECT_STATUSES: { value: ProjectStatus; label: string }[] = [
 export const HOUR_TYPES: { value: HourType; label: string }[] = [
   { value: "billable", label: "Billable" },
   { value: "non_billable", label: "Non-billable" },
-  { value: "admin", label: "Admin" },
+  { value: "admin", label: "Agency" },
   { value: "meeting", label: "Meeting" },
-  { value: "pto", label: "PTO" },
+  { value: "pto", label: "Time off" },
+];
+
+export type TimeCategoryKind = "work" | "time_off" | "holiday";
+export type TimeCategory = { id: string; name: string; group_name: "Agency" | "Non-Client"; kind: TimeCategoryKind; active: boolean; sort_order: number };
+export const TIME_CATEGORY_KINDS: { value: TimeCategoryKind; label: string }[] = [
+  { value: "work", label: "Agency work (not billable)" },
+  { value: "time_off", label: "Time off" },
+  { value: "holiday", label: "Holiday" },
 ];
 
 export type ProjectTemplate = {
