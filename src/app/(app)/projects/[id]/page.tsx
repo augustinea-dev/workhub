@@ -7,6 +7,7 @@ import { Board, type BoardCard } from "@/components/board";
 import { ConfirmDelete, FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
 import { ProjectNameFields } from "@/components/project-name-fields";
 import { BudgetBar, Empty, Flash, HealthBadge, PageHeader, ProjectBadge, ProjectDot, TaskBadge } from "@/components/ui";
+import { linkify } from "@/components/linkify";
 import { ASSIGNEES, assigneeLabel, openRoleNames, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
 import { projectBudget } from "@/lib/budget";
 import { formatDate, relativeDay, todayISO } from "@/lib/dates";
@@ -585,7 +586,7 @@ export default async function ProjectPage({
                 <div><dt className="label">Start</dt><dd>{formatDate(p.start_date)}</dd></div>
                 <div><dt className="label">Due</dt><dd>{formatDate(p.due_date)}</dd></div>
               </div>
-              <div><dt className="label">Description</dt><dd className="whitespace-pre-wrap text-stone-700">{p.description || <span className="text-stone-500">No description</span>}</dd></div>
+              <div><dt className="label">Description</dt><dd className="whitespace-pre-wrap text-stone-700">{p.description ? linkify(p.description) : <span className="text-stone-500">No description</span>}</dd></div>
             </dl>
           )}
         </section>

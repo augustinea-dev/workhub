@@ -160,6 +160,7 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
   - Post progress notes, questions and handoffs. Updates can't be edited once posted.
   - Type **@** to mention someone (pick from the list by name or email). They get a **Mention** in their inbox, and their name is highlighted in the update.
   - For files, paste a Dropbox link in an update, or open the project's Dropbox folder. Workhub doesn't store files.
+  - Web addresses (starting with http://, https:// or www.) in updates and in task and project descriptions become links that open in a new tab.
 - **Admins only:** delete updates.
 
 ## Logging time

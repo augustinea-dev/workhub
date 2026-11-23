@@ -7,6 +7,7 @@ import { ConfirmDelete, LiveRefresh, SubmitButton } from "@/components/client";
 import { MentionComposer } from "@/components/mention-composer";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, HealthBadge, TaskBadge, TimerButton } from "@/components/ui";
+import { linkify } from "@/components/linkify";
 import { getMyTimer } from "@/lib/timer";
 import { assigneeLabel, openRoleNames, pickerOptions, roleIdsOf, withAssignees } from "@/lib/assignees";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
@@ -68,7 +69,7 @@ function InfoCard({ title, children, action }: { title: string; children: React.
 }
 
 function withMentions(body: string, names: string[], myName: string): React.ReactNode {
-  if (!names.length) return body;
+  if (!names.length) return linkify(body);
   const pattern = [...names].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return body.split(new RegExp(`(@(?:${pattern.join("|")}))`, "g")).map((part, i) =>
     i % 2 ? (
@@ -79,7 +80,7 @@ function withMentions(body: string, names: string[], myName: string): React.Reac
         {part}
       </span>
     ) : (
-      part
+      linkify(part, `${i}-`)
     ),
   );
 }
@@ -307,7 +308,7 @@ export default async function TaskPage({
             <section className="card p-4">
               <h2 className="mb-2 text-sm font-semibold">Description</h2>
               {t.description ? (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-800">{t.description}</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-800">{linkify(t.description)}</p>
               ) : (
                 <p className="text-sm text-stone-500">
                   {isAdmin ? "No description yet. Use Edit task to add one." : "No description yet. If you need more detail, ask in Updates below."}
