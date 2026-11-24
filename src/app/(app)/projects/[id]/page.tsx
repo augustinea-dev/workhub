@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createTask, deleteProject, makeDropboxFolder, saveProjectAsTemplate, updateProject } from "../../actions";
+import { createTask, deleteProject, makeDropboxFolder, moveTaskInList, saveProjectAsTemplate, updateProject } from "../../actions";
 import { AssigneePicker } from "@/components/assignee-picker";
 import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { Board, type BoardCard } from "@/components/board";
@@ -145,15 +145,43 @@ export default async function ProjectPage({
   const chip = (active: boolean) =>
     `rounded-full px-3 py-1 text-xs font-medium ${active ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`;
 
-  const taskRows = (t: Task, indent: boolean, depth = 0): React.ReactNode[] => [taskRow(t, indent, depth), ...shownKids(t).flatMap((k) => taskRows(k, indent, depth + 1))];
-  const taskRow = (t: Task, indent: boolean, depth: number) => {
+  const canReorder = isAdmin && !closedProject && tf.sort === "order" && tf.dir === "asc" && !tFiltered;
+  type Pos = { first: boolean; last: boolean };
+  const posOf = (i: number, n: number): Pos => ({ first: i === 0, last: i === n - 1 });
+  const taskRows = (t: Task, indent: boolean, depth = 0, pos: Pos = { first: true, last: true }): React.ReactNode[] => {
+    const ks = shownKids(t);
+    return [taskRow(t, indent, depth, pos), ...ks.flatMap((k, i) => taskRows(k, indent, depth + 1, posOf(i, ks.length)))];
+  };
+  const moveButton = (t: Task, direction: "up" | "down", disabled: boolean) => (
+    <form action={moveTaskInList}>
+      <input type="hidden" name="id" value={t.id} />
+      <input type="hidden" name="direction" value={direction} />
+      <input type="hidden" name="redirect_to" value={here} />
+      <button
+        disabled={disabled}
+        aria-label={`Move ${t.title} ${direction}`}
+        className="grid h-6 w-6 place-items-center rounded text-stone-500 hover:bg-stone-200 hover:text-stone-900 disabled:pointer-events-none disabled:opacity-25"
+      >
+        <svg viewBox="0 0 16 16" className={`h-3 w-3 ${direction === "down" ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 10l4-4 4 4" />
+        </svg>
+      </button>
+    </form>
+  );
+  const taskRow = (t: Task, indent: boolean, depth: number, pos: Pos = { first: true, last: true }) => {
     const sub = depth > 0;
     const late = t.due_date && t.due_date < today && t.status !== "done";
     const all = kids.get(t.id) ?? [];
     const canChange = !closedProject && all.length === 0 && canChangeStatus(me, t);
     return (
-      <tr key={t.id} className="hover:bg-stone-50">
+      <tr key={t.id} className="group hover:bg-stone-50">
         <td className="table-cell" style={{ paddingLeft: `${(indent ? 2 : 1) + depth * 1.25}rem` }}>
+          {canReorder && !t.is_milestone && (
+            <span className="float-right ml-2 flex opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              {moveButton(t, "up", pos.first)}
+              {moveButton(t, "down", pos.last)}
+            </span>
+          )}
           {sub && <span aria-hidden="true" className="mr-1.5 text-stone-400">↳</span>}
           <Link
             href={`/tasks/${t.id}`}
@@ -336,7 +364,7 @@ export default async function ProjectPage({
               <table className="w-full min-w-[560px]">
                 <thead>
                   <tr>
-                    <th className="table-head">Task</th>
+                    {sortHead("order", "Task")}
                     {sortHead("assignee", "Assignee")}
                     {sortHead("due", "Due")}
                     {sortHead("status", "Status")}
@@ -382,7 +410,7 @@ export default async function ProjectPage({
                           )}
                         </td>
                       </tr>
-                      {g.shown.flatMap((t) => taskRows(t, true))}
+                      {g.shown.flatMap((t, i) => taskRows(t, true, 0, posOf(i, g.shown.length)))}
                     </tbody>
                   );
                 })}
@@ -395,7 +423,7 @@ export default async function ProjectPage({
                         </td>
                       </tr>
                     )}
-                    {ungrouped.flatMap((t) => taskRows(t, milestoneGroups.length > 0))}
+                    {ungrouped.flatMap((t, i) => taskRows(t, milestoneGroups.length > 0, 0, posOf(i, ungrouped.length)))}
                   </tbody>
                 )}
               </table>

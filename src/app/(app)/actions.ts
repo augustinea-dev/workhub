@@ -627,7 +627,9 @@ export async function updateTask(fd: FormData) {
   const estimate = Number.parseFloat(str(fd, "estimate_hours"));
   const isMilestone = str(fd, "is_milestone") === "on";
   const supabase = await createClient();
-  const { data: before } = await supabase.from("tasks").select("due_date, task_assignees(profile_id)").eq("id", id).maybeSingle();
+  const { data: before } = await supabase.from("tasks").select("due_date, parent_task_id, task_assignees(profile_id)").eq("id", id).maybeSingle();
+  const newParent = fd.has("parent_task_id") ? opt(fd, "parent_task_id") : undefined;
+  const parentChanged = newParent !== undefined && newParent !== (before?.parent_task_id ?? null);
   const people = assigneeIdsFrom(fd);
   const dueChanged = (before?.due_date ?? null) !== dueDate;
   const had = ((before?.task_assignees ?? []) as { profile_id: string }[]).map((a) => a.profile_id);
@@ -644,17 +646,59 @@ export async function updateTask(fd: FormData) {
       estimate_hours: Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
       is_milestone: isMilestone,
       milestone_id: isMilestone ? null : opt(fd, "milestone_id"),
+      ...(parentChanged ? { parent_task_id: newParent } : {}),
     })
     .eq("id", id)
     .eq("version", int(fd, "version"))
     .select("id");
   if (error) fail(path, error.message);
   if (!data?.length) fail(path, CONFLICT);
-  const assignError =
-    (await syncAssignees(supabase, "task_assignees", "task_id", id, assigneeIdsFrom(fd))) ??
-    (await syncRoleSlots(supabase, "task_role_slots", "task_id", id, roleSlotIdsFrom(fd)));
+  let assignError: string | null = null;
+  if (parentChanged) {
+    const { data: now } = await supabase.from("task_assignees").select("profile_id").eq("task_id", id);
+    const { data: slots } = await supabase.from("task_role_slots").select("role_id").eq("task_id", id);
+    const arrivedPeople = (now ?? []).map((a) => a.profile_id as string).filter((x) => !had.includes(x));
+    assignError = await syncAssignees(supabase, "task_assignees", "task_id", id, [...new Set([...people, ...arrivedPeople])]);
+    const wanted = roleSlotIdsFrom(fd);
+    const extra = [...(slots ?? []).map((r) => r.role_id as string)];
+    for (const r of wanted) {
+      const k = extra.indexOf(r);
+      if (k >= 0) extra.splice(k, 1);
+    }
+    assignError ??= await syncRoleSlots(supabase, "task_role_slots", "task_id", id, [...wanted, ...extra]);
+  } else {
+    assignError =
+      (await syncAssignees(supabase, "task_assignees", "task_id", id, people)) ??
+      (await syncRoleSlots(supabase, "task_role_slots", "task_id", id, roleSlotIdsFrom(fd)));
+  }
   if (assignError) fail(path, `Task saved, but its assignees couldn't be saved: ${assignError}`);
   done(path, "Task saved.");
+}
+
+export async function moveTaskInList(fd: FormData) {
+  await requireAdmin();
+  const id = str(fd, "id");
+  const back = safePath(str(fd, "redirect_to"), "/projects");
+  const up = str(fd, "direction") === "up";
+  const supabase = await createClient();
+  const { data: t } = await supabase.from("tasks").select("project_id, parent_task_id, milestone_id, is_milestone").eq("id", id).maybeSingle();
+  if (!t || t.is_milestone) fail(back, "That task can't be moved.");
+  let q = supabase.from("tasks").select("id, sort_order").eq("project_id", t.project_id).eq("is_milestone", false);
+  q = t.parent_task_id ? q.eq("parent_task_id", t.parent_task_id) : q.is("parent_task_id", null);
+  if (!t.parent_task_id) q = t.milestone_id ? q.eq("milestone_id", t.milestone_id) : q.is("milestone_id", null);
+  const { data: sibs, error } = await q.order("sort_order").order("created_at");
+  if (error) fail(back, error.message);
+  const was = new Map((sibs ?? []).map((x) => [x.id as string, Number(x.sort_order)]));
+  const order = [...was.keys()];
+  const i = order.indexOf(id);
+  const j = up ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= order.length) done(back);
+  [order[i], order[j]] = [order[j], order[i]];
+  const changes = order.map((taskId, k) => ({ taskId, sort: (k + 1) * 1000 })).filter((c) => was.get(c.taskId) !== c.sort);
+  const results = await Promise.all(changes.map((c) => supabase.from("tasks").update({ sort_order: c.sort }).eq("id", c.taskId)));
+  const failed = results.find((r) => r.error);
+  if (failed?.error) fail(back, failed.error.message);
+  done(back);
 }
 
 /**

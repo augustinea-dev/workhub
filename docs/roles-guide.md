@@ -23,7 +23,7 @@ Filters live in the page address, so a filtered view can be bookmarked or shared
 
 - **Everyone:**
   - **Projects:** search by project or client name; filter by Status (Open, All, or one status), Client (including "No client"), Owner (including "No owner") and Type. Click the Project, Client, Next milestone or Due column headings to sort; click again to reverse.
-  - **A project's list view:** filter by Assignee (Everyone, Mine, Unassigned, or a person), Status, and Overdue only. Sort by Assignee, Due or Status from the column headings. Tasks stay grouped under their milestones, and done tasks stay at the bottom unless you sort by status.
+  - **A project's list view:** filter by Assignee (Everyone, Mine, Unassigned, or a person), Status, and Overdue only. Tasks show in the project's own order by default (select **Task** to return to it); sort by Assignee, Due or Status from the column headings instead. Tasks stay grouped under their milestones, and when sorting by a column, done tasks stay at the bottom unless you sort by status.
   - **My Work:** filter your tasks by project or client (shown once your tasks span more than one project).
 - **Admins:** same as everyone.
 
@@ -153,6 +153,8 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 - **Admins only:**
   - **Add a subtask** (title, assignees, start, due, planned hours). Dates start as the parent's.
   - **When a task gets its first subtask**, its people, open roles, logged time and any running timer move onto that subtask, so nothing is lost.
+  - **Move a task:** on its edit form, pick a **Parent task** (shown as a path, like "QA › Round 1") or **None (top level)**. Its subtasks come with it. Only places it can legally go are listed (not under itself, not past 4 levels). If the new parent had people or time on it, they move onto the moved task.
+  - **Reorder:** in a project's list view, hover a task and use the ↑ ↓ buttons to move it among the tasks at the same level (and in the same milestone). They show when the list is in its own order with no filters.
   - Edit or delete subtasks. Deleting a parent also deletes its subtasks, and the button says how many.
   - Calculated dates and hours on a parent can't be edited by hand; change the subtasks instead.
 - Milestones can't have subtasks or be subtasks. Subtasks follow their top-level task's milestone.
