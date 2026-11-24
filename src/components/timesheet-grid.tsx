@@ -19,6 +19,7 @@ export type GridRow = {
   projectId?: string;
   kind: "task" | "project" | "category";
   roleId: string | null;
+  allocation?: { share: number; logged: number };
   cells: Record<string, GridCell>;
 };
 export type AddableTask = { key: string; label: string; group: string; groupClient?: string; groupTitle?: string; groupHref?: string; projectId: string; href: string; roleId: string | null };
@@ -356,10 +357,18 @@ function GroupRows({
       </tr>
       {group.rows.map((r) => {
         const total = days.reduce((s, d) => s + num(`${r.key}|${d}`), 0);
+        const rowPending = days.reduce((s, d) => s + num(`${r.key}|${d}`) - (Number.parseFloat(original[`${r.key}|${d}`] ?? "") || 0), 0);
+        const used = r.allocation ? r.allocation.logged + rowPending : 0;
         return (
           <tr key={r.key} className="border-b border-stone-100">
             <td className="table-cell pl-6 text-stone-500">
               {r.href ? <Link href={r.href} className="hover:underline">{r.label}</Link> : r.label}
+              {r.allocation && (
+                <span className={`block text-xs tabular-nums ${used > r.allocation.share + 0.005 ? "font-medium text-red-700" : "text-stone-400"}`}>
+                  {+used.toFixed(2)} of {+r.allocation.share.toFixed(2)} h allocated
+                  {used > r.allocation.share + 0.005 && ` (${+(used - r.allocation.share).toFixed(2)} h over)`}
+                </span>
+              )}
             </td>
             <td className="table-cell">
               {r.kind === "category" ? (
