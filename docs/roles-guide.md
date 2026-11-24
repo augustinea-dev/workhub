@@ -246,6 +246,8 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 - **Decision (Admins and the project owner):** **Approve**, **Request changes** or **Back to In review**, with who decided and when.
 - Complete or Cancelled projects: no new proofs, versions or decisions; comments still work.
 - Admins can rename and delete a proof (deleting removes its files, versions and comments).
+- **Proofs page** (sidebar): every proof with its project, task, latest version, open comments on that version and status; filter Not approved (default), In review, Changes requested, Approved or All.
+- **Notices** (Inbox, marked Proof): a new version (v2 and later), a new comment or reply, and a decision go to the task's people, the project owner and whoever added the proof (a reply also reaches the comment's author), never to the person who did it. Opening one goes to the proof. Projects in Planning stay quiet.
 
 ## Exports (CSV)
 

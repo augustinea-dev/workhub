@@ -9,11 +9,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .from("notification_events")
     .update({ read_at: new Date().toISOString() })
     .eq("id", id)
-    .select("task_id, project_id, timesheet:timesheets(week_start)")
+    .select("task_id, project_id, proof_id, timesheet:timesheets(week_start)")
     .maybeSingle();
   const sheet = data?.timesheet as { week_start: string } | { week_start: string }[] | null | undefined;
   const week = Array.isArray(sheet) ? sheet[0]?.week_start : sheet?.week_start;
-  const target = data?.task_id
+  const target = data?.proof_id
+    ? `/proofs/${data.proof_id}`
+    : data?.task_id
     ? `/tasks/${data.task_id}`
     : week
       ? `/time?week=${week}`
