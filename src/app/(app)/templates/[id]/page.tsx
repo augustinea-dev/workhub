@@ -182,7 +182,7 @@ export default async function TemplatePage({
   const roleName = (rid: string) => jobRoles.find((r) => r.id === rid)?.name ?? "Role";
   const here = `/templates/${id}${requested ? `?start=${requested}` : ""}`;
   const withQ = (k: string, v: string) => `/templates/${id}?${new URLSearchParams({ ...(requested ? { start: requested } : {}), [k]: v })}`;
-  const grid = "grid items-end gap-2 md:grid-cols-4";
+  const grid = "grid items-start gap-x-2 gap-y-3 md:grid-cols-4";
 
   return (
     <>
