@@ -456,7 +456,7 @@ export default async function ProjectPage({
                 <input type="hidden" name="version" value={p.version} />
                 <ProjectNameFields
                   key={p.version}
-                  clients={companies}
+                  clients={companies.filter((c) => c.active || c.id === p.company_id)}
                   types={projectTypes.filter((t) => t.active || t.code === p.project_type)}
                   reference={p.reference_number}
                   today={today}

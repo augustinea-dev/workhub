@@ -13,7 +13,7 @@ export const getPeople = cache(async (): Promise<Profile[]> => {
 
 export const getCompanies = cache(async (): Promise<Company[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month").order("name");
+  const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month, active").order("name");
   return (data ?? []) as Company[];
 });
 

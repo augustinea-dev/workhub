@@ -93,6 +93,22 @@ export async function updateCompany(fd: FormData) {
   done("/clients", `Saved ${name}. Its projects' names are updated to match.`);
 }
 
+export async function setCompanyActive(fd: FormData) {
+  await requireAdmin();
+  const active = str(fd, "active") === "true";
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("companies").update({ active }).eq("id", str(fd, "id")).select("name");
+  if (error) fail("/clients", error.message);
+  if (!data?.length) fail("/clients", "Only an admin can change clients.");
+  done("/clients", active ? `${data[0].name} is active again.` : `${data[0].name} is inactive. Its projects are unchanged.`);
+}
+
+async function inactiveClient(supabase: Awaited<ReturnType<typeof createClient>>, companyId: string | null): Promise<string | null> {
+  if (!companyId) return null;
+  const { data } = await supabase.from("companies").select("name, active").eq("id", companyId).maybeSingle();
+  return data && !data.active ? `${data.name} is inactive. Reactivate it on the Clients page first.` : null;
+}
+
 export async function deleteCompany(fd: FormData) {
   await requireAdmin();
   const supabase = await createClient();
@@ -379,9 +395,11 @@ export async function createProject(fd: FormData) {
   const me = await requireAdmin();
   const naming = namingFields(fd);
   if (!naming.title) fail("/projects", "Enter a project title.");
+  const supabase = await createClient();
+  const inactive = await inactiveClient(supabase, opt(fd, "company_id"));
+  if (inactive) fail("/projects", inactive);
   if (str(fd, "template_id")) return createProjectFromTemplate(fd, me.id);
   const dropbox_url = dropboxUrl(fd, "/projects");
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
     .insert({
@@ -452,6 +470,11 @@ export async function updateProject(fd: FormData) {
   if (refText && !(Number.isInteger(reference) && reference! > 0)) fail(path, "Reference number must be a whole number.");
   const dropbox_url = dropboxUrl(fd, path);
   const supabase = await createClient();
+  const { data: current } = await supabase.from("projects").select("company_id").eq("id", id).maybeSingle();
+  if (opt(fd, "company_id") !== (current?.company_id ?? null)) {
+    const inactive = await inactiveClient(supabase, opt(fd, "company_id"));
+    if (inactive) fail(path, inactive);
+  }
   const { data, error } = await supabase
     .from("projects")
     .update({

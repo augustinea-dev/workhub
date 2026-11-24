@@ -24,6 +24,7 @@ export type Company = {
   name: string;
   project_label: string | null;
   fiscal_year_start_month: number | null;
+  active: boolean;
 };
 
 export type ProjectType = { code: string; label: string; description: string | null; active: boolean; sort_order: number };
