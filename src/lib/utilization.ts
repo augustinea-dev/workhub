@@ -112,7 +112,7 @@ async function pages<T>(build: (start: number, end: number) => PromiseLike<{ dat
   }
 }
 
-type Entry = { user_id: string; project_id: string | null; work_date: string; hours: number | string; hour_type: HourType; category: { kind: string } | null };
+type Entry = { user_id: string; project_id: string | null; work_date: string; hours: number | string; hour_type: HourType; category: { kind: string; name: string } | null };
 type PlanTask = {
   id: string;
   title: string;
@@ -133,7 +133,7 @@ export async function loadReportData(from: string, to: string) {
     pages<Entry>((a, b) =>
       supabase
         .from("time_entries")
-        .select("user_id, project_id, work_date, hours, hour_type, category:time_categories(kind)")
+        .select("user_id, project_id, work_date, hours, hour_type, category:time_categories(kind, name)")
         .gte("work_date", from)
         .lte("work_date", to)
         .order("id")

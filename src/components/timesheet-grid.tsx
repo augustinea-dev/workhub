@@ -249,7 +249,9 @@ export function TimesheetGrid({
                   </button>
                 </>
               )}
-              <span className="text-xs text-stone-400">To add a note, select the pencil on an hours box or press Enter in it.</span>
+              <span className="text-xs text-stone-400">
+                To add a note, select the pencil on an hours box or press Enter in it. Planning time off? Go to that week and enter the hours in Vacation or Sick Leave.
+              </span>
             </div>
             <div className="flex items-center gap-3">
               {dirty && <span className="text-xs font-medium text-amber-800">Unsaved changes</span>}

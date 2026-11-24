@@ -76,6 +76,7 @@ export default async function WorkloadPage({ searchParams }: { searchParams: Pro
             <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-red-100 ring-1 ring-red-200" />Over their hours</span>
             <span className="inline-flex items-center gap-1.5"><span className="wl-hatch h-3 w-3 rounded-sm ring-1 ring-stone-200" />Weekend</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-amber-100 ring-1 ring-amber-200" />Holiday</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-violet-100 ring-1 ring-violet-200" />Time off (from timesheets)</span>
             <span>Select a day to see its tasks.</span>
           </div>
           {more && (
