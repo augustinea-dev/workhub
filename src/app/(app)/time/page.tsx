@@ -172,8 +172,10 @@ export default async function TimePage({
     });
   const holidayCategory = categories.find((c) => c.kind === "holiday" && c.active);
 
+  const { data: parentRows } = await supabase.from("tasks").select("parent_task_id").not("parent_task_id", "is", null).limit(10000);
+  const parentIds = new Set((parentRows ?? []).map((r) => r.parent_task_id as string));
   const addable: AddableTask[] = ((open ?? []) as unknown as TaskOption[])
-    .filter((t) => t.project && OPEN.includes(t.project.status))
+    .filter((t) => t.project && OPEN.includes(t.project.status) && !parentIds.has(t.id))
     .map((t) => ({
       key: `t:${t.id}`,
       label: t.title,

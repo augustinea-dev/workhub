@@ -143,17 +143,19 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 **Where:** the Subtasks section on a task page.
 
 - **Everyone:**
-  - A subtask is a full task under another task: its own page, status, assignees, dates, updates and time. One level deep for now.
+  - A subtask is a full task under another task: its own page, status, dates and updates. Subtasks can have their own subtasks, up to **4 levels below a top-level task** (like Workfront's parent task plus 4 levels).
+  - **A task with subtasks is a container.** People, open roles and time go on the subtasks that do the work, not on the parent, so a parent doesn't show on timesheets or My Work.
+  - A parent's **status follows its subtasks**: Done when all are done, In progress once any has started, otherwise To do. It can't be set by hand.
+  - A parent's **start, due and planned hours are calculated from its subtasks** (earliest start, latest due, total hours), all the way up.
   - The parent shows "3 of 5 done" with a progress bar. Tick the box next to a subtask assigned to you to mark it done (tick again to undo).
-  - A parent's **start, due and planned hours are calculated from its subtasks** (earliest start, latest due, total hours) whenever its subtasks have them.
-  - When every subtask is done, the parent's assignees see "All subtasks are done. Mark this task done?" The parent isn't completed automatically.
-  - The parent's Hours card counts time logged on its subtasks too, with an "On subtasks" line.
-  - In a project's list view, subtasks appear indented (↳) under their parent, and the parent shows "2/5 subtasks". On the board, each subtask is its own card labelled with its parent. On My Work, subtasks show their parent's name.
+  - The parent's Hours card counts time logged on every level below it, with an "On subtasks" line.
+  - The task page shows the full chain of parents at the top. In a project's list view, each level is indented further, and parents show "On subtasks" instead of people. On the board, parents can't be dragged (their status follows their subtasks).
 - **Admins only:**
   - **Add a subtask** (title, assignees, start, due, planned hours). Dates start as the parent's.
+  - **When a task gets its first subtask**, its people, open roles, logged time and any running timer move onto that subtask, so nothing is lost.
   - Edit or delete subtasks. Deleting a parent also deletes its subtasks, and the button says how many.
   - Calculated dates and hours on a parent can't be edited by hand; change the subtasks instead.
-- Milestones can't have subtasks or be subtasks. A subtask follows its parent's milestone.
+- Milestones can't have subtasks or be subtasks. Subtasks follow their top-level task's milestone.
 
 ## Milestones
 

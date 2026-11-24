@@ -106,7 +106,7 @@ export default async function TaskPage({
     supabase
       .from("tasks")
       .select(
-        "*, task_assignees(profile_id, as_role_id), task_role_slots(id, role_id), project:projects(id, name, status, dropbox_url, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id), task_role_slots(id, role_id))), parent:parent_task_id(id, title)",
+        "*, task_assignees(profile_id, as_role_id), task_role_slots(id, role_id), project:projects(id, name, status, dropbox_url, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, parent_task_id, task_assignees(profile_id), task_role_slots(id, role_id))), parent:parent_task_id(id, title)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -138,10 +138,22 @@ export default async function TaskPage({
     project: { id: string; name: string; dropbox_url: string | null; company: { name: string } | null; tasks: ProjectTask[] };
     parent: { id: string; title: string } | null;
   };
-  const parent = t.parent;
   const subtasks = ((children ?? []) as Raw<Child>[]).map(withAssignees) as Child[];
-  const { data: childTime } = subtasks.length
-    ? await supabase.from("time_entries").select("hours").in("task_id", subtasks.map((s) => s.id))
+  const tree = t.project.tasks as unknown as { id: string; title: string; parent_task_id: string | null }[];
+  const treeById = new Map(tree.map((x) => [x.id, x]));
+  const ancestors: { id: string; title: string }[] = [];
+  for (let up = t.parent_task_id ? treeById.get(t.parent_task_id) : undefined; up && ancestors.length < 6; up = up.parent_task_id ? treeById.get(up.parent_task_id) : undefined) {
+    ancestors.unshift({ id: up.id, title: up.title });
+  }
+  const descendants: string[] = [];
+  for (let level = [id]; level.length; ) {
+    level = tree.filter((x) => x.parent_task_id && level.includes(x.parent_task_id)).map((x) => x.id);
+    descendants.push(...level);
+  }
+  const hasKids = new Set(tree.filter((x) => x.parent_task_id).map((x) => x.parent_task_id as string));
+  const isParent = subtasks.length > 0;
+  const { data: childTime } = descendants.length
+    ? await supabase.from("time_entries").select("hours").in("task_id", descendants)
     : { data: [] as { hours: number }[] };
   const subtaskHours = (childTime ?? []).reduce((s, e) => s + Number(e.hours), 0);
   const subtasksDone = subtasks.filter((s) => s.status === "done").length;
@@ -150,7 +162,7 @@ export default async function TaskPage({
     due: subtasks.some((s) => s.due_date),
     estimate: subtasks.some((s) => s.estimate_hours != null),
   };
-  const canHaveSubtasks = !t.parent_task_id && !t.is_milestone;
+  const canHaveSubtasks = !t.is_milestone && ancestors.length < 4;
   const thread = (comments ?? []) as Comment[];
   const entries = (time ?? []) as TimeEntry[];
   const logged = entries.reduce((s, e) => s + Number(e.hours), 0);
@@ -245,12 +257,12 @@ export default async function TaskPage({
         {" · "}
         {t.project.company?.name && <>{t.project.company.name} · </>}
         <Link href={`/projects/${t.project.id}`} className="hover:underline">{t.project.name}</Link>
-        {parent && (
-          <>
+        {ancestors.map((a) => (
+          <span key={a.id}>
             {" · "}
-            <Link href={`/tasks/${parent.id}`} className="hover:underline">{parent.title}</Link>
-          </>
-        )}
+            <Link href={`/tasks/${a.id}`} className="hover:underline">{a.title}</Link>
+          </span>
+        ))}
       </p>
       <div className="mb-2 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">
@@ -260,7 +272,7 @@ export default async function TaskPage({
         <TaskBadge status={t.status} />
       </div>
       <p className="mb-6 text-sm text-stone-600">
-        {t.assignee_ids.length ? <>Assigned to <span className="font-medium text-stone-900">{assigneeName}</span></> : "Unassigned"}
+        {isParent ? "People are on its subtasks" : t.assignee_ids.length ? <>Assigned to <span className="font-medium text-stone-900">{assigneeName}</span></> : "Unassigned"}
         {" · "}
         {t.due_date ? <>Due {dueText}</> : dueText}
       </p>
@@ -273,7 +285,7 @@ export default async function TaskPage({
         </div>
       )}
 
-      {canChangeStatus(me, t) && !editing && !frozen && (
+      {canChangeStatus(me, t) && !editing && !frozen && !isParent && (
         <section className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <h2 className="text-sm font-semibold">{isAssignee ? "Your status" : "Status"}</h2>
@@ -304,7 +316,7 @@ export default async function TaskPage({
         </section>
       )}
 
-      {!isAdmin && !canChangeStatus(me, t) && (
+      {!isAdmin && !canChangeStatus(me, t) && !isParent && (
         <p className="mb-6 rounded-md border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
           {t.assignee_ids.length
             ? `This task is assigned to ${assigneeName}. You can post updates and log time; ${t.assignee_ids.length > 1 ? "its assignees" : assigneeName} or an admin can change its status.`
@@ -346,19 +358,6 @@ export default async function TaskPage({
             </section>
           )}
 
-          {subtasks.length > 0 && subtasksDone === subtasks.length && !isDone && canChangeStatus(me, t) && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              <span>All subtasks are done. Mark this task done?</span>
-              <form action={setTaskStatus}>
-                <input type="hidden" name="id" value={t.id} />
-                <input type="hidden" name="version" value={t.version} />
-                <input type="hidden" name="status" value="done" />
-                <input type="hidden" name="redirect_to" value={here} />
-                <SubmitButton pendingText="Saving…">Mark done</SubmitButton>
-              </form>
-            </div>
-          )}
-
           {canHaveSubtasks && subtasks.length > 0 && (
             <section className="card overflow-hidden">
               <div className="border-b border-stone-200 px-4 py-3">
@@ -388,7 +387,7 @@ export default async function TaskPage({
                     const late = !done && !!s.due_date && s.due_date < today;
                     return (
                       <li key={s.id} className="flex items-center gap-3 border-b border-stone-100 px-4 py-3 last:border-0">
-                        {canChangeStatus(me, s) ? (
+                        {canChangeStatus(me, s) && !frozen && !hasKids.has(s.id) ? (
                           <form action={setTaskStatus}>
                             <input type="hidden" name="id" value={s.id} />
                             <input type="hidden" name="version" value={s.version} />
@@ -422,7 +421,7 @@ export default async function TaskPage({
                             {s.title}
                           </Link>
                           <p className="text-xs text-stone-500">
-                            {assigneeLabel(s.assignee_ids, people, me.id)}
+                            {hasKids.has(s.id) ? `${tree.filter((x) => x.parent_task_id === s.id).length} subtasks` : assigneeLabel(s.assignee_ids, people, me.id)}
                             {s.due_date && (
                               <span className={late ? "font-medium text-red-700" : undefined}> · Due {formatDate(s.due_date)}</span>
                             )}
@@ -494,14 +493,14 @@ export default async function TaskPage({
                 Time <span className="font-normal text-stone-400">· {hrs(logged)} logged</span>
                 {estimate != null && <span className="font-normal text-stone-400"> of {hrs(estimate)} planned</span>}
               </h2>
-              {!noTime && <TimerButton taskId={id} runningTaskId={timer?.task_id ?? null} redirectTo={here} />}
+              {!noTime && !isParent && <TimerButton taskId={id} runningTaskId={timer?.task_id ?? null} redirectTo={here} />}
             </div>
             {timeRows.length === 0 ? (
               <Empty>No time logged on this task yet.</Empty>
             ) : (
               <TimeEntryTable rows={timeRows} meId={me.id} isAdmin={isAdmin} redirectTo={here} second="person" />
             )}
-            {!noTime && (
+            {!noTime && !isParent && (
             <form action={logTime} className="border-t border-stone-200 bg-stone-50 p-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Log time</p>
               <div className="flex flex-wrap gap-2">
@@ -533,7 +532,7 @@ export default async function TaskPage({
                 </div>
                 <div>
                   <label className="label" htmlFor="status">Status</label>
-                  <select id="status" name="status" defaultValue={t.status} className="input w-full">
+                  <select id="status" name="status" defaultValue={t.status} disabled={isParent} className="input w-full disabled:bg-stone-50 disabled:text-stone-500">
                     {TASK_STATUSES.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
@@ -549,12 +548,18 @@ export default async function TaskPage({
                     <input id="due_date" name="due_date" type="date" defaultValue={t.due_date ?? ""} disabled={rolled.due} className="input w-full disabled:bg-stone-50 disabled:text-stone-500" />
                   </div>
                 </div>
-                <div>
-                  <AssigneePicker key={t.version} {...pickerOptions(people, t.assignee_ids)} defaultValue={t.assignee_ids} />
-                  <div className="mt-3">
-                    <RoleSlotsPicker key={t.version} roles={jobRoles} defaultValue={t.open_roles.map((s) => s.role_id)} />
+                {isParent ? (
+                  <p className="rounded-md bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                    This task has subtasks, so its status follows them, and people, open roles and time go on the subtasks.
+                  </p>
+                ) : (
+                  <div>
+                    <AssigneePicker key={t.version} {...pickerOptions(people, t.assignee_ids)} defaultValue={t.assignee_ids} />
+                    <div className="mt-3">
+                      <RoleSlotsPicker key={t.version} roles={jobRoles} defaultValue={t.open_roles.map((s) => s.role_id)} />
+                    </div>
                   </div>
-                </div>
+                )}
                 {(rolled.start || rolled.due) && (
                   <p className="-mt-1 text-xs text-stone-500">Calculated from subtasks.</p>
                 )}
@@ -638,7 +643,7 @@ export default async function TaskPage({
                       ))}
                     </ul>
                   ) : (
-                    <span className="text-stone-500">No one yet</span>
+                    <span className="text-stone-500">{isParent ? "On its subtasks" : "No one yet"}</span>
                   )}
                 </Field>
                 {t.open_roles.length > 0 && (

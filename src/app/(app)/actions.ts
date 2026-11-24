@@ -599,9 +599,18 @@ export async function createTask(fd: FormData) {
     .select("id")
     .single();
   if (error || !created) fail(back, error?.message ?? "Couldn't add the task.");
-  const assignError =
-    (await syncAssignees(supabase, "task_assignees", "task_id", created.id, assigneeIdsFrom(fd))) ??
-    (await syncRoleSlots(supabase, "task_role_slots", "task_id", created.id, roleSlotIdsFrom(fd)));
+  let assignError: string | null = null;
+  if (parentId) {
+    const { data: moved } = await supabase.from("task_assignees").select("profile_id").eq("task_id", created.id);
+    const have = (moved ?? []).map((a) => a.profile_id as string);
+    assignError = await syncAssignees(supabase, "task_assignees", "task_id", created.id, [...new Set([...have, ...assigneeIdsFrom(fd)])]);
+    const { data: slots } = await supabase.from("task_role_slots").select("role_id").eq("task_id", created.id);
+    assignError ??= await syncRoleSlots(supabase, "task_role_slots", "task_id", created.id, [...(slots ?? []).map((r) => r.role_id as string), ...roleSlotIdsFrom(fd)]);
+  } else {
+    assignError =
+      (await syncAssignees(supabase, "task_assignees", "task_id", created.id, assigneeIdsFrom(fd))) ??
+      (await syncRoleSlots(supabase, "task_role_slots", "task_id", created.id, roleSlotIdsFrom(fd)));
+  }
   if (assignError) fail(back, `Added “${title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Added “${title}”.`);
 }
