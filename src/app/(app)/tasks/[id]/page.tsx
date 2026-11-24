@@ -8,6 +8,8 @@ import { MentionComposer } from "@/components/mention-composer";
 import { TimeEntryTable, type TimeRow } from "@/components/time-entries";
 import { Empty, Flash, HealthBadge, TaskBadge, TimerButton } from "@/components/ui";
 import { linkify } from "@/components/linkify";
+import { ProofUpload } from "@/components/proof-upload";
+import { proofingOn, proofStatus, type ProofStatus } from "@/lib/proofing";
 import { getMyTimer } from "@/lib/timer";
 import { assigneeLabel, openRoleNames, pickerOptions, roleIdsOf, withAssignees } from "@/lib/assignees";
 import { daysBetween, formatDate, formatDay, formatTimestamp, relativeDay, todayISO } from "@/lib/dates";
@@ -196,6 +198,12 @@ export default async function TaskPage({
   const editing = isAdmin && !frozen && sp(query.edit) === "1";
   const today = todayISO();
   const timer = await getMyTimer();
+  const showProofs = proofingOn(me.role);
+  const { data: proofData } = showProofs
+    ? await supabase.from("proofs").select("id, title, status, updated_at, proof_versions(number)").eq("task_id", id).order("created_at")
+    : { data: null };
+  const proofs = (proofData ?? []) as { id: string; title: string; status: ProofStatus; updated_at: string; proof_versions: { number: number }[] }[];
+  const canAddProof = showProofs && !frozen && (isAdmin || t.assignee_ids.includes(me.id));
   const isAssignee = t.assignee_ids.includes(me.id);
   const isDone = t.status === "done";
   const dueIn = t.due_date ? daysBetween(today, t.due_date) : null;
@@ -459,6 +467,37 @@ export default async function TaskPage({
           )}
 
           {canHaveSubtasks && subtasks.length === 0 && isAdmin && !frozen && <section className="card overflow-hidden">{addSubtask}</section>}
+
+          {showProofs && (proofs.length > 0 || canAddProof) && (
+            <section className="card overflow-hidden">
+              <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
+                Proofs <span className="font-normal text-stone-400">· {proofs.length} · test</span>
+              </h2>
+              {proofs.length > 0 && (
+                <ul>
+                  {proofs.map((pf) => {
+                    const st = proofStatus(pf.status);
+                    const latest = Math.max(0, ...pf.proof_versions.map((v) => v.number));
+                    return (
+                      <li key={pf.id} className="flex items-center gap-3 border-b border-stone-100 px-4 py-3">
+                        <Link href={`/proofs/${pf.id}`} className="min-w-0 flex-1 truncate text-sm font-medium hover:underline">{pf.title}</Link>
+                        <span className="text-xs text-stone-500">v{latest}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.tone}`}>{st.label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {canAddProof && (
+                <details className="bg-stone-50" open={proofs.length === 0}>
+                  <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-blue-700 hover:underline">+ Add a proof</summary>
+                  <div className="px-4 pb-4">
+                    <ProofUpload taskId={id} />
+                  </div>
+                </details>
+              )}
+            </section>
+          )}
 
           <section className="card">
             <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
