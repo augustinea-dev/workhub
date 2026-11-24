@@ -89,3 +89,64 @@ export async function deleteProof(fd: FormData) {
   revalidatePath(`/tasks/${proof.task_id}`);
   redirect(`/tasks/${proof.task_id}?notice=${encodeURIComponent("Proof deleted, with all its versions and comments.")}`);
 }
+
+type Done = { error?: string };
+
+async function proofPathFor(supabase: Awaited<ReturnType<typeof createClient>>, versionId: string) {
+  const { data } = await supabase.from("proof_versions").select("proof_id").eq("id", versionId).maybeSingle();
+  return data ? `/proofs/${data.proof_id}` : null;
+}
+
+export async function addProofComment(versionId: string, page: number, x: number, y: number, body: string): Promise<Done> {
+  await gate();
+  const text = body.trim();
+  if (!text) return { error: "Write a comment first." };
+  if (!(page >= 1 && x >= 0 && x <= 1 && y >= 0 && y <= 1)) return { error: "Place the pin on the proof." };
+  const supabase = await createClient();
+  const me = await requireProfile();
+  const { error } = await supabase
+    .from("proof_comments")
+    .insert({ version_id: versionId, page, x: +x.toFixed(5), y: +y.toFixed(5), body: text, author_id: me.id });
+  if (error) return { error: error.message };
+  const path = await proofPathFor(supabase, versionId);
+  if (path) revalidatePath(path);
+  return {};
+}
+
+export async function replyProofComment(versionId: string, parentId: string, body: string): Promise<Done> {
+  await gate();
+  const text = body.trim();
+  if (!text) return { error: "Write a reply first." };
+  const supabase = await createClient();
+  const me = await requireProfile();
+  const { error } = await supabase.from("proof_comments").insert({ version_id: versionId, parent_id: parentId, body: text, author_id: me.id });
+  if (error) return { error: error.message };
+  const path = await proofPathFor(supabase, versionId);
+  if (path) revalidatePath(path);
+  return {};
+}
+
+export async function resolveProofComment(commentId: string, resolved: boolean): Promise<Done> {
+  await gate();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("resolve_proof_comment", { p_comment: commentId, p_resolved: resolved });
+  return error ? { error: error.message } : {};
+}
+
+export async function deleteProofComment(commentId: string): Promise<Done> {
+  await gate();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("proof_comments").delete().eq("id", commentId).select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: "You can only delete your own comments." };
+  return {};
+}
+
+export async function decideProof(proofId: string, status: "in_review" | "changes_requested" | "approved"): Promise<Done> {
+  await gate();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decide_proof", { p_proof: proofId, p_status: status });
+  if (error) return { error: error.message };
+  revalidatePath(`/proofs/${proofId}`);
+  return {};
+}
