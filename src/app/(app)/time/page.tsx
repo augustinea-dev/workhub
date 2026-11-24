@@ -20,7 +20,7 @@ type Row = {
   note: string | null;
   job_role_id: string | null;
   category_id: string | null;
-  project: { id: string; name: string; title: string | null; company: { name: string } | null } | null;
+  project: { id: string; name: string; title: string | null; status: string; status_changed_at: string; company: { name: string } | null } | null;
   task: { id: string; title: string } | null;
   category: { name: string; group_name: string } | null;
 };
@@ -28,8 +28,12 @@ type Row = {
 type TaskOption = {
   id: string;
   title: string;
-  project: { id: string; name: string; title: string | null; status: string; company: { name: string } | null } | null;
+  project: { id: string; name: string; title: string | null; status: string; status_changed_at: string; company: { name: string } | null } | null;
 };
+
+const OPEN = ["active", "on_hold"];
+const lockFor = (status: string) =>
+  status === "planning" ? "Planning: time opens when it's Active" : status === "complete" ? "Complete: read only" : status === "cancelled" ? "Cancelled: read only" : undefined;
 
 const projectLabel = (p: { name: string; title: string | null; company: { name: string } | null }) =>
   `${p.company?.name ? `${p.company.name} · ` : ""}${p.title || p.name}`;
@@ -62,7 +66,7 @@ export default async function TimePage({
     supabase
       .from("time_entries")
       .select(
-        "id, user_id, work_date, hours, hour_type, note, job_role_id, category_id, project:projects(id, name, title, company:companies(name)), task:tasks(id, title), category:time_categories(name, group_name)",
+        "id, user_id, work_date, hours, hour_type, note, job_role_id, category_id, project:projects(id, name, title, status, status_changed_at, company:companies(name)), task:tasks(id, title), category:time_categories(name, group_name)",
       )
       .eq("user_id", userId)
       .gte("work_date", week)
@@ -78,10 +82,10 @@ export default async function TimePage({
         : Promise.resolve({ count: 0 }),
     supabase
       .from("tasks")
-      .select("id, title, project:projects(id, name, title, status, company:companies(name)), task_assignees!inner(profile_id)")
+      .select("id, title, project:projects(id, name, title, status, status_changed_at, company:companies(name)), task_assignees!inner(profile_id)")
       .eq("task_assignees.profile_id", userId)
       .or(stillOn),
-    supabase.from("tasks").select("id, title, project:projects(id, name, title, status, company:companies(name))").or(stillOn).order("title").limit(2000),
+    supabase.from("tasks").select("id, title, project:projects(id, name, title, status, status_changed_at, company:companies(name))").or(stillOn).order("title").limit(2000),
   ]);
   const ts = sheet as Timesheet | null;
   const status = ts?.status ?? "open";
@@ -119,13 +123,14 @@ export default async function TimePage({
       projectId: t.project?.id,
       kind: "task",
       roleId: mainRole,
+      locked: t.project ? lockFor(t.project.status) : undefined,
     }));
   for (const r of rows) {
     let row: GridRow;
     if (r.category_id) {
       continue;
     } else if (r.task) {
-      row = taskRow({ id: r.task.id, title: r.task.title, project: r.project ? { ...r.project, status: "" } : null });
+      row = taskRow({ id: r.task.id, title: r.task.title, project: r.project });
     } else {
       const p = r.project!;
       row = ensure(`p:${p.id}`, () => ({
@@ -138,6 +143,7 @@ export default async function TimePage({
         projectId: p.id,
         kind: "project",
         roleId: mainRole,
+        locked: lockFor(p.status),
       }));
     }
     const c = (row.cells[r.work_date] ??= { hours: 0, note: null, count: 0 });
@@ -147,7 +153,8 @@ export default async function TimePage({
     if (r.job_role_id !== undefined) row.roleId = r.job_role_id;
   }
   for (const t of (assigned ?? []) as unknown as TaskOption[]) {
-    if (t.project && !["complete", "cancelled"].includes(t.project.status)) taskRow(t);
+    if (!t.project || t.project.status === "planning") continue;
+    if (OPEN.includes(t.project.status) || week <= addDays(t.project.status_changed_at.slice(0, 10), 14)) taskRow(t);
   }
   const workRows = [...grid.values()].sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
 
@@ -166,7 +173,7 @@ export default async function TimePage({
   const holidayCategory = categories.find((c) => c.kind === "holiday" && c.active);
 
   const addable: AddableTask[] = ((open ?? []) as unknown as TaskOption[])
-    .filter((t) => t.project && !["complete", "cancelled"].includes(t.project.status))
+    .filter((t) => t.project && OPEN.includes(t.project.status))
     .map((t) => ({
       key: `t:${t.id}`,
       label: t.title,

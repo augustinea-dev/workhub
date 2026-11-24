@@ -20,6 +20,7 @@ export type GridRow = {
   kind: "task" | "project" | "category";
   roleId: string | null;
   allocation?: { share: number; logged: number };
+  locked?: string;
   cells: Record<string, GridCell>;
 };
 export type AddableTask = { key: string; label: string; group: string; groupClient?: string; groupTitle?: string; groupHref?: string; projectId: string; href: string; roleId: string | null };
@@ -361,11 +362,21 @@ function GroupRows({
         const total = days.reduce((s, d) => s + num(`${r.key}|${d}`), 0);
         const rowPending = days.reduce((s, d) => s + num(`${r.key}|${d}`) - (Number.parseFloat(original[`${r.key}|${d}`] ?? "") || 0), 0);
         const used = r.allocation ? r.allocation.logged + rowPending : 0;
+        const rowEditable = editable && !r.locked;
         return (
           <tr key={r.key} className="border-b border-stone-100">
             <td className="table-cell pl-6 text-stone-500">
               {r.href ? <Link href={r.href} className="hover:underline">{r.label}</Link> : r.label}
-              {r.allocation && (
+              {r.locked && (
+                <span className="flex items-center gap-1 text-xs text-stone-500">
+                  <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                    <rect x="3.5" y="7" width="9" height="6.5" rx="1" />
+                    <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+                  </svg>
+                  {r.locked}
+                </span>
+              )}
+              {r.allocation && !r.locked && (
                 <span className={`block text-xs tabular-nums ${used > r.allocation.share + 0.005 ? "font-medium text-red-700" : "text-stone-400"}`}>
                   {+used.toFixed(2)} of {+r.allocation.share.toFixed(2)} h allocated
                   {used > r.allocation.share + 0.005 && ` (${+(used - r.allocation.share).toFixed(2)} h over)`}
@@ -375,7 +386,7 @@ function GroupRows({
             <td className="table-cell">
               {r.kind === "category" ? (
                 <span className="text-xs text-stone-400">n/a</span>
-              ) : editable ? (
+              ) : rowEditable ? (
                 <select
                   value={roleOf(r)}
                   onChange={(e) => setRole(r.key, e.target.value)}
@@ -398,7 +409,7 @@ function GroupRows({
               const isOpen = noteAt?.key === r.key && noteAt.day === d;
               return (
                 <td key={d} className={`px-1 py-1 text-center ${closedDays.includes(d) ? "bg-amber-50/60" : ""}`}>
-                  {editable ? (
+                  {rowEditable ? (
                     <span className="group relative inline-block">
                       <input
                         type="number"

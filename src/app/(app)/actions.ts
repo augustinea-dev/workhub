@@ -470,7 +470,20 @@ export async function updateProject(fd: FormData) {
   if (refText && !(Number.isInteger(reference) && reference! > 0)) fail(path, "Reference number must be a whole number.");
   const dropbox_url = dropboxUrl(fd, path);
   const supabase = await createClient();
-  const { data: current } = await supabase.from("projects").select("company_id").eq("id", id).maybeSingle();
+  const { data: current } = await supabase.from("projects").select("company_id, status").eq("id", id).maybeSingle();
+  const closed = (v: string | undefined) => v === "complete" || v === "cancelled";
+  const nextStatus = oneOf(str(fd, "status"), PROJECT_STATUSES, "active");
+  if (closed(current?.status) && closed(nextStatus)) {
+    const { data, error } = await supabase
+      .from("projects")
+      .update({ status: nextStatus, name_locked: locked, ...(locked ? { name } : {}) })
+      .eq("id", id)
+      .eq("version", int(fd, "version"))
+      .select("id");
+    if (error) fail(path, error.message);
+    if (!data?.length) fail(path, CONFLICT);
+    done(path, "Project saved. Only the status and custom name change while it's closed.");
+  }
   if (opt(fd, "company_id") !== (current?.company_id ?? null)) {
     const inactive = await inactiveClient(supabase, opt(fd, "company_id"));
     if (inactive) fail(path, inactive);
@@ -950,6 +963,11 @@ export async function startTimer(fd: FormData) {
     if (running.task_id === taskId) done(back, "Your timer is already running on this task.");
     const title = (running.task as unknown as { title: string } | null)?.title ?? "another task";
     fail(back, `Your timer is running on "${title}". Stop it first, then log or discard that time.`);
+  }
+  const { data: task } = await supabase.from("tasks").select("project:projects(status)").eq("id", taskId).maybeSingle();
+  const pst = (task?.project as unknown as { status: string } | null)?.status;
+  if (pst && !["active", "on_hold"].includes(pst)) {
+    fail(back, pst === "planning" ? "That project is in Planning, so time can't be logged yet." : "That project is closed, so time can't be logged on it.");
   }
   const { error } = await supabase.from("running_timers").insert({ task_id: taskId });
   if (error) fail(back, error.message);

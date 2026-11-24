@@ -68,7 +68,7 @@ export const getProjectOptions = cache(async (): Promise<{ id: string; name: str
   const { data } = await supabase
     .from("projects")
     .select("id, name")
-    .not("status", "in", "(complete,cancelled)")
+    .in("status", ["active", "on_hold"])
     .order("name");
   return data ?? [];
 });

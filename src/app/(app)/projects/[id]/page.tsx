@@ -51,6 +51,7 @@ export default async function ProjectPage({
   if (!project) notFound();
 
   const p = project as Project;
+  const closedProject = p.status === "complete" || p.status === "cancelled";
   const list = ((tasks ?? []) as (Omit<Task, "assignee_ids" | "open_roles"> & { task_assignees: { profile_id: string }[] })[]).map(
     withAssignees,
   ) as Task[];
@@ -138,7 +139,7 @@ export default async function ProjectPage({
         due: t.due_date ? formatDate(t.due_date) : null,
         late: !!t.due_date && t.due_date < today && t.status !== "done",
         hours: est != null ? `${+logged.toFixed(2)} / ${+est.toFixed(2)} h` : logged ? `${+logged.toFixed(2)} h` : null,
-        canMove: canChangeStatus(me, t),
+        canMove: !closedProject && canChangeStatus(me, t),
       };
     });
   const chip = (active: boolean) =>
@@ -146,7 +147,7 @@ export default async function ProjectPage({
 
   const taskRow = (t: Task, indent: boolean, sub = false) => {
     const late = t.due_date && t.due_date < today && t.status !== "done";
-    const canChange = canChangeStatus(me, t);
+    const canChange = !closedProject && canChangeStatus(me, t);
     const all = kids.get(t.id) ?? [];
     return (
       <tr key={t.id} className="hover:bg-stone-50">
@@ -227,6 +228,19 @@ export default async function ProjectPage({
         )}
       </PageHeader>
       <Flash error={sp(query.error)} notice={sp(query.notice)} />
+      {(p.status === "planning" || closedProject) && (
+        <div role="status" className={`mb-4 rounded-lg border px-4 py-3 text-sm ${p.status === "planning" ? "border-sky-200 bg-sky-50 text-sky-900" : "border-stone-200 bg-stone-100 text-stone-700"}`}>
+          {p.status === "planning" ? (
+            <>
+              <span className="font-semibold">Planning.</span> Notifications are paused while it&apos;s set up, it&apos;s off people&apos;s My Work, and time can&apos;t be logged yet. When you set it to Active, each person gets one notice listing their tasks.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">{p.status === "complete" ? "Complete" : "Cancelled"}: read only.</span> Updates can still be posted. Only the status and custom name can change; set it back to Active to edit anything else or log time.
+            </>
+          )}
+        </div>
+      )}
 
       <div className={view === "board" ? "space-y-6" : "grid gap-6 lg:grid-cols-3"}>
         <section className={`card overflow-hidden ${view === "board" ? "" : "lg:col-span-2"}`}>
@@ -338,7 +352,7 @@ export default async function ProjectPage({
                 )}
                 {listGroups.map((g) => {
                   const m = g.milestone;
-                  const canChange = canChangeStatus(me, m);
+                  const canChange = !closedProject && canChangeStatus(me, m);
                   return (
                     <tbody key={m.id}>
                       <tr className="bg-stone-50">
@@ -389,7 +403,7 @@ export default async function ProjectPage({
             </div>
           )}
 
-          {isAdmin && (
+          {isAdmin && !closedProject && (
             <form action={createTask} className="border-t border-stone-200 bg-stone-50 p-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Add a task</p>
               <div className="grid items-end gap-2 md:grid-cols-6">
@@ -452,6 +466,11 @@ export default async function ProjectPage({
           {editing ? (
             <>
               <form action={updateProject} className="space-y-3">
+                {closedProject && (
+                  <p className="rounded-md bg-stone-100 px-3 py-2 text-xs text-stone-700">
+                    While it&apos;s {p.status === "complete" ? "Complete" : "Cancelled"}, only the status and custom name are saved. Set it to Active to change the rest.
+                  </p>
+                )}
                 <input type="hidden" name="id" value={id} />
                 <input type="hidden" name="version" value={p.version} />
                 <ProjectNameFields
