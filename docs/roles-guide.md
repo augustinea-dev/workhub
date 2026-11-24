@@ -128,6 +128,8 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
   - Delete the task.
   - Delete updates.
 
+- **Due dates and days off (Admins):** a task can't be due on an office closure, or on a day one of its people has a full day of time off logged. The message names who is out. It's checked when you add or edit a task, change its due date, add someone, or fill an open role (and when a User takes open work). Projects made from templates aren't blocked, and time off booked after a task is already due that day isn't blocked either: the Workload page shows it in red.
+
 ## Subtasks
 
 **Where:** the Subtasks section on a task page.
@@ -208,6 +210,7 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
     - Holidays from the Admin page are shaded, and their **Holiday** hours are filled in (your daily hours). Save the week to keep them.
     - You're warned before leaving the page with unsaved edits.
   - **Log one entry** under the grid still adds a single entry the old way.
+- **Planning time off:** go to the week with the → arrow on the Time page and enter the hours in the right General Time row (Vacation, Sick Leave, Flex Day and so on), then **Save week**. A half day is just fewer hours. You can't submit a future week, but the hours count right away: the Workload page shows the day as out, Reports take it out of available hours, and tasks can't be made due that day.
   - The **Timesheet** panel shows the week's status: Open, Submitted, Approved or Returned.
   - **Submit for approval** once you've saved at least your hours per week (40 unless an Admin set something else). Time off and Holiday count. Weeks that haven't started can't be submitted, but you can fill in time off ahead.
   - Submitted and approved weeks are **locked**: no adding, editing or removing time.
@@ -283,6 +286,7 @@ Files open in Excel or Google Sheets.
 - **Each day:** the hours planned from task estimates (the same split as Reports: each task's estimate shared evenly among its people and open roles, over its working days from start to due). Blue is within the person's hours for that day, red is over. Weekends are hatched, holidays say **Holiday**, and a day fully taken by logged time off says **Off**.
 - **Select a day** to see its tasks with their hours; each task links to its page.
 - **Expand a person** (the arrow by their name, or **Expand all**) to see each of their tasks as a bar from its start to its due date, with their share of its hours. A bar that runs past the dates shown has a flat edge. Select a bar or task name to open the task.
+- **Time off:** hours logged in a time off row (Vacation, Sick Leave, and so on), including future ones, take the day's available hours down and show the row's name on the day, shaded purple when it covers the whole day. Planned work on that day turns red.
 - **Unassigned work** (top row): hours on open roles and on tasks with nobody on them. Hidden when filtering by team.
 - Finished tasks, and parent tasks whose subtasks have estimates, aren't counted. Tasks with an estimate but no dates are listed under Unscheduled in Reports.
 - **Users:** can't open it.

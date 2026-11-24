@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireProfile } from "@/lib/session";
 import { getPeople, getTeams } from "@/lib/data";
-import { addDays, daysBetween, isValidISODate, isWorkingDay } from "@/lib/dates";
+import { addDays, daysBetween, formatDate, isValidISODate, isWorkingDay } from "@/lib/dates";
 import { authorizeUrl, createProjectFolder, dropboxStatus, removeConnection } from "@/lib/dropbox";
 import { dropboxRedirectUri } from "@/lib/dropbox-redirect";
 import { NOTIFICATION_KINDS, PROJECT_STATUSES, TASK_STATUSES, TIME_CATEGORY_KINDS } from "@/lib/types";
@@ -163,15 +163,44 @@ async function syncRoleSlots(
   return null;
 }
 
+async function dueDateClash(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  due: string | null,
+  people: string[],
+  checkClosure: boolean,
+): Promise<string | null> {
+  if (!due) return null;
+  if (checkClosure) {
+    const { data: hol } = await supabase.from("holidays").select("name").eq("day", due).maybeSingle();
+    if (hol) return `${formatDate(due)} is an office closure (${hol.name}). Pick another due date.`;
+  }
+  if (!people.length) return null;
+  const [{ data: off }, { data: who }] = await Promise.all([
+    supabase.from("time_entries").select("user_id, hours, category:time_categories!inner(name, kind)").eq("work_date", due).in("user_id", people).eq("category.kind", "time_off"),
+    supabase.from("profiles").select("id, full_name, weekly_hours").in("id", people),
+  ]);
+  const out: string[] = [];
+  for (const p of who ?? []) {
+    const rows = ((off ?? []) as unknown as { user_id: string; hours: number | string; category: { name: string } }[]).filter((r) => r.user_id === p.id);
+    const hours = rows.reduce((n, r) => n + Number(r.hours), 0);
+    const daily = Number(p.weekly_hours ?? 40) / 5;
+    if (rows.length && hours >= daily - 0.005) out.push(`${p.full_name} is out on ${formatDate(due)} (${[...new Set(rows.map((r) => r.category.name))].join(", ")})`);
+  }
+  return out.length ? `${out.join("; ")}. Pick another due date.` : null;
+}
+
 function roleSlotIdsFrom(fd: FormData): string[] {
   return fd.getAll("role_slot_ids").map(String).filter(Boolean);
 }
 
 // ---------- job roles ----------
 export async function takeRoleTask(fd: FormData) {
-  await requireProfile();
+  const me = await requireProfile();
   const back = safePath(str(fd, "redirect_to"), "/");
   const supabase = await createClient();
+  const { data: slot } = await supabase.from("task_role_slots").select("task:tasks(due_date)").eq("id", str(fd, "slot_id")).maybeSingle();
+  const clash = await dueDateClash(supabase, (slot?.task as unknown as { due_date: string | null } | null)?.due_date ?? null, [me.id], false);
+  if (clash) fail(back, clash);
   const { data, error } = await supabase.rpc("take_role_task", { p_slot: str(fd, "slot_id") });
   if (error || !data) fail(back, error?.message ?? "Couldn't take that work.");
   done(back, "It's yours. The task is now on your My Work.");
@@ -183,6 +212,9 @@ export async function assignRoleSlot(fd: FormData) {
   const person = str(fd, "profile_id");
   if (!person) fail(back, "Pick someone to fill the role.");
   const supabase = await createClient();
+  const { data: slot } = await supabase.from("task_role_slots").select("task:tasks(due_date)").eq("id", str(fd, "slot_id")).maybeSingle();
+  const clash = await dueDateClash(supabase, (slot?.task as unknown as { due_date: string | null } | null)?.due_date ?? null, [person], false);
+  if (clash) fail(back, clash);
   const { error } = await supabase.rpc("assign_role_slot", { p_slot: str(fd, "slot_id"), p_profile: person });
   if (error) fail(back, error.message);
   done(back, "Role filled.");
@@ -514,6 +546,8 @@ export async function createTask(fd: FormData) {
   const parentId = opt(fd, "parent_task_id");
   const isMilestone = !parentId && str(fd, "is_milestone") === "on";
   const supabase = await createClient();
+  const clash = await dueDateClash(supabase, dueDate, assigneeIdsFrom(fd), true);
+  if (clash) fail(back, clash);
   const { data: created, error } = await supabase
     .from("tasks")
     .insert({
@@ -548,6 +582,12 @@ export async function updateTask(fd: FormData) {
   const estimate = Number.parseFloat(str(fd, "estimate_hours"));
   const isMilestone = str(fd, "is_milestone") === "on";
   const supabase = await createClient();
+  const { data: before } = await supabase.from("tasks").select("due_date, task_assignees(profile_id)").eq("id", id).maybeSingle();
+  const people = assigneeIdsFrom(fd);
+  const dueChanged = (before?.due_date ?? null) !== dueDate;
+  const had = ((before?.task_assignees ?? []) as { profile_id: string }[]).map((a) => a.profile_id);
+  const clash = await dueDateClash(supabase, dueDate, dueChanged ? people : people.filter((x) => !had.includes(x)), dueChanged);
+  if (clash) fail(path, clash);
   const { data, error } = await supabase
     .from("tasks")
     .update({

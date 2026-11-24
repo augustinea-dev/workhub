@@ -5,7 +5,7 @@ import { type loadReportData, workingDaysIn } from "@/lib/utilization";
 export const WEEKS = { start: 3, step: 3, max: 52 };
 
 export type DayTask = { id: string; title: string; project: string; hours: number; roles?: string[] };
-export type DayCell = { capacity: number; pto: number; planned: number; holiday: boolean; tasks: DayTask[] };
+export type DayCell = { capacity: number; pto: number; off: string[]; planned: number; holiday: boolean; tasks: DayTask[] };
 export type RowTask = { id: string; title: string; project: string; start: string; end: string; hours: number; roles?: string[] };
 export type WorkloadRow = { id: string; name: string; role: string | null; days: Record<string, DayCell>; tasks: RowTask[] };
 
@@ -26,7 +26,7 @@ export function buildWorkload(opts: {
 
   const blankDays = (weekly: number) =>
     Object.fromEntries(
-      days.map((d) => [d, { capacity: isWorkingDay(d, holidays) ? weekly / 5 : 0, pto: 0, planned: 0, holiday: holidays.has(d), tasks: [] } as DayCell]),
+      days.map((d) => [d, { capacity: isWorkingDay(d, holidays) ? weekly / 5 : 0, pto: 0, off: [], planned: 0, holiday: holidays.has(d), tasks: [] } as DayCell]),
     );
 
   const rows: WorkloadRow[] = people
@@ -42,7 +42,10 @@ export function buildWorkload(opts: {
   for (const e of data.entries) {
     if (e.hour_type !== "pto" || e.category?.kind === "holiday") continue;
     const c = byId.get(e.user_id)?.days[e.work_date];
-    if (c) c.pto += Number(e.hours);
+    if (!c) continue;
+    c.pto += Number(e.hours);
+    const name = e.category?.name ?? "Time off";
+    if (!c.off.includes(name)) c.off.push(name);
   }
 
   const addTask = (c: DayCell, t: DayTask) => {

@@ -249,8 +249,9 @@ function Day({ c, sunday, unassigned, active, label, onOpen }: { c: DayCell; sun
   const has = c.planned > 0.005;
   const working = c.capacity > 0;
   const over = !unassigned && has && c.planned > avail + 0.005;
-  const off = !unassigned && working && c.pto > 0.005 && avail < 0.005;
-  const bg = c.holiday ? "bg-amber-50" : !working && !unassigned ? "wl-hatch" : "";
+  const off = !unassigned && c.pto > 0.005;
+  const offLabel = c.off.join(", ");
+  const bg = c.holiday ? "bg-amber-50" : off && avail < 0.005 && working ? "bg-violet-50" : !working && !unassigned ? "wl-hatch" : "";
   const tone = unassigned ? "bg-stone-200 text-stone-800" : over ? "bg-red-100 text-red-700 font-semibold" : "bg-sky-100 text-sky-900";
   return (
     <td className={`h-12 border-b border-stone-200 p-0.5 text-center ${sunday ? "border-l" : ""} ${bg}`}>
@@ -264,7 +265,7 @@ function Day({ c, sunday, unassigned, active, label, onOpen }: { c: DayCell; sun
         >
           {has && <span>{h(c.planned)}</span>}
           {c.holiday && <span className="text-[10px] font-medium text-amber-800">Holiday</span>}
-          {off && !c.holiday && <span className="text-[10px] font-medium">Off</span>}
+          {off && !c.holiday && <span className={`max-w-full truncate px-0.5 text-[10px] font-medium ${has ? "" : "text-violet-800"}`} title={`${offLabel}: ${h(c.pto)} h`}>{offLabel}</span>}
         </button>
       ) : null}
     </td>
