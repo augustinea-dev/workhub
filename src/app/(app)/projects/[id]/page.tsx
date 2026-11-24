@@ -72,8 +72,8 @@ export default async function ProjectPage({
   const byColumn = compareTasks(tf, people);
   const kids = new Map<string, Task[]>();
   for (const t of list) if (t.parent_task_id) kids.set(t.parent_task_id, [...(kids.get(t.parent_task_id) ?? []), t]);
-  const shownKids = (t: Task) => (kids.get(t.id) ?? []).filter(matches).sort(byColumn);
-  const showsUp = (t: Task) => matches(t) || shownKids(t).length > 0;
+  const showsUp = (t: Task): boolean => matches(t) || (kids.get(t.id) ?? []).some(showsUp);
+  const shownKids = (t: Task) => (kids.get(t.id) ?? []).filter(showsUp).sort(byColumn);
   const ungrouped = list.filter((t) => !t.is_milestone && !t.milestone_id && !t.parent_task_id && showsUp(t)).sort(byColumn);
   const listGroups = milestoneGroups
     .map((g) => ({ ...g, shown: g.tasks.filter(showsUp).sort(byColumn) }))
@@ -114,7 +114,7 @@ export default async function ProjectPage({
   }
   const milestoneTitle = new Map(milestoneGroups.map((g) => [g.milestone.id, g.milestone.title]));
   const byId = new Map(list.map((t) => [t.id, t]));
-  const milestoneOf = (t: Task) => t.milestone_id ?? (t.parent_task_id ? byId.get(t.parent_task_id)?.milestone_id ?? null : null);
+  const milestoneOf = (t: Task): string | null => t.milestone_id ?? (t.parent_task_id && byId.get(t.parent_task_id) ? milestoneOf(byId.get(t.parent_task_id)!) : null);
   const byDue = (a: Task, b: Task) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999") || a.sort_order - b.sort_order;
   const byFinished = (a: Task, b: Task) => (b.completed_at ?? "").localeCompare(a.completed_at ?? "");
   const boardCards: BoardCard[] = list
@@ -139,19 +139,21 @@ export default async function ProjectPage({
         due: t.due_date ? formatDate(t.due_date) : null,
         late: !!t.due_date && t.due_date < today && t.status !== "done",
         hours: est != null ? `${+logged.toFixed(2)} / ${+est.toFixed(2)} h` : logged ? `${+logged.toFixed(2)} h` : null,
-        canMove: !closedProject && canChangeStatus(me, t),
+        canMove: !closedProject && !kids.has(t.id) && canChangeStatus(me, t),
       };
     });
   const chip = (active: boolean) =>
     `rounded-full px-3 py-1 text-xs font-medium ${active ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`;
 
-  const taskRow = (t: Task, indent: boolean, sub = false) => {
+  const taskRows = (t: Task, indent: boolean, depth = 0): React.ReactNode[] => [taskRow(t, indent, depth), ...shownKids(t).flatMap((k) => taskRows(k, indent, depth + 1))];
+  const taskRow = (t: Task, indent: boolean, depth: number) => {
+    const sub = depth > 0;
     const late = t.due_date && t.due_date < today && t.status !== "done";
-    const canChange = !closedProject && canChangeStatus(me, t);
     const all = kids.get(t.id) ?? [];
+    const canChange = !closedProject && all.length === 0 && canChangeStatus(me, t);
     return (
       <tr key={t.id} className="hover:bg-stone-50">
-        <td className={`table-cell ${sub ? (indent ? "pl-14" : "pl-9") : indent ? "pl-8" : ""}`}>
+        <td className="table-cell" style={{ paddingLeft: `${(indent ? 2 : 1) + depth * 1.25}rem` }}>
           {sub && <span aria-hidden="true" className="mr-1.5 text-stone-400">↳</span>}
           <Link
             href={`/tasks/${t.id}`}
@@ -166,8 +168,8 @@ export default async function ProjectPage({
             </span>
           )}
         </td>
-        <td className={`table-cell ${t.assignee_ids.includes(me.id) ? "font-medium" : "text-stone-600"}`}>
-          {assigneeLabel(t.assignee_ids, people, me.id, openRoleNames(t.open_roles, jobRoles))}
+        <td className={`table-cell ${all.length ? "text-stone-400" : t.assignee_ids.includes(me.id) ? "font-medium" : "text-stone-600"}`}>
+          {all.length ? "On subtasks" : assigneeLabel(t.assignee_ids, people, me.id, openRoleNames(t.open_roles, jobRoles))}
         </td>
         <td className={`table-cell whitespace-nowrap ${late ? "font-medium text-red-700" : "text-stone-600"}`}>
           {formatDate(t.due_date)}
@@ -380,7 +382,7 @@ export default async function ProjectPage({
                           )}
                         </td>
                       </tr>
-                      {g.shown.flatMap((t) => [taskRow(t, true), ...shownKids(t).map((k) => taskRow(k, true, true))])}
+                      {g.shown.flatMap((t) => taskRows(t, true))}
                     </tbody>
                   );
                 })}
@@ -393,10 +395,7 @@ export default async function ProjectPage({
                         </td>
                       </tr>
                     )}
-                    {ungrouped.flatMap((t) => [
-                      taskRow(t, milestoneGroups.length > 0),
-                      ...shownKids(t).map((k) => taskRow(k, milestoneGroups.length > 0, true)),
-                    ])}
+                    {ungrouped.flatMap((t) => taskRows(t, milestoneGroups.length > 0))}
                   </tbody>
                 )}
               </table>
