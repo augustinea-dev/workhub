@@ -6,7 +6,8 @@ export const WEEKS = { start: 3, step: 3, max: 52 };
 
 export type DayTask = { id: string; title: string; project: string; hours: number; roles?: string[] };
 export type DayCell = { capacity: number; pto: number; planned: number; holiday: boolean; tasks: DayTask[] };
-export type WorkloadRow = { id: string; name: string; role: string | null; days: Record<string, DayCell> };
+export type RowTask = { id: string; title: string; project: string; start: string; end: string; hours: number; roles?: string[] };
+export type WorkloadRow = { id: string; name: string; role: string | null; days: Record<string, DayCell>; tasks: RowTask[] };
 
 export function buildWorkload(opts: {
   people: Profile[];
@@ -32,11 +33,11 @@ export function buildWorkload(opts: {
     .filter((p) => p.active && (!teamIds || teamIds.includes(p.id)))
     .map((p) => {
       const main = p.job_roles?.find((r) => r.is_main)?.role_id;
-      return { id: p.id, name: p.full_name, role: main ? roleName(main) : null, days: blankDays(Number(p.weekly_hours ?? 0)) };
+      return { id: p.id, name: p.full_name, role: main ? roleName(main) : null, days: blankDays(Number(p.weekly_hours ?? 0)), tasks: [] };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
   const byId = new Map(rows.map((r) => [r.id, r]));
-  const unassigned: WorkloadRow = { id: "unassigned", name: "Unassigned work", role: "Open roles and tasks with no one on them", days: blankDays(0) };
+  const unassigned: WorkloadRow = { id: "unassigned", name: "Unassigned work", role: "Open roles and tasks with no one on them", days: blankDays(0), tasks: [] };
 
   for (const e of data.entries) {
     if (e.hour_type !== "pto" || e.category?.kind === "holiday") continue;
@@ -68,6 +69,13 @@ export function buildWorkload(opts: {
     const shares = t.task_assignees.length + t.task_role_slots.length || 1;
     const perDay = est / shares / span.length;
     const base = { id: t.id, title: t.title, project: projectName.get(t.project_id) ?? "" };
+    if (span.some((d) => d >= from && d <= to)) {
+      for (const as of t.task_assignees) byId.get(as.profile_id)?.tasks.push({ ...base, start: a, end: b, hours: est / shares });
+      const open = t.task_role_slots.length;
+      if (!teamIds && (open || !t.task_assignees.length)) {
+        unassigned.tasks.push({ ...base, start: a, end: b, hours: (est / shares) * (open || 1), roles: t.task_role_slots.map((s) => roleName(s.role_id)) });
+      }
+    }
     for (const d of span) {
       if (d < from || d > to) continue;
       for (const as of t.task_assignees) {
@@ -82,7 +90,10 @@ export function buildWorkload(opts: {
     }
   }
 
-  for (const r of [...rows, unassigned]) for (const c of Object.values(r.days)) c.tasks.sort((x, y) => y.hours - x.hours);
+  for (const r of [...rows, unassigned]) {
+    for (const c of Object.values(r.days)) c.tasks.sort((x, y) => y.hours - x.hours);
+    r.tasks.sort((x, y) => x.start.localeCompare(y.start) || x.end.localeCompare(y.end) || x.title.localeCompare(y.title));
+  }
   const hasUnassigned = Object.values(unassigned.days).some((c) => c.planned > 0.005);
   return { days, rows, unassigned: hasUnassigned ? unassigned : null, unscheduled };
 }

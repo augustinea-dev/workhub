@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { DayCell, WorkloadRow } from "@/lib/workload";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import type { DayCell, RowTask, WorkloadRow } from "@/lib/workload";
 
 const h = (n: number) => (+n.toFixed(2)).toString();
 const date = (iso: string, opts: Intl.DateTimeFormatOptions) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { ...opts, timeZone: "UTC" });
@@ -29,6 +29,14 @@ export function WorkloadGrid({
   const panel = useRef<HTMLDivElement>(null);
   const anchor = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState<Open | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) =>
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   useEffect(() => {
     loading.current = false;
@@ -82,6 +90,8 @@ export function WorkloadGrid({
     else weeks.push({ start: d, count: 1 });
   }
   const allRows = unassigned ? [unassigned, ...rows] : rows;
+  const expandable = allRows.filter((r) => r.tasks.length);
+  const allOpen = expandable.length > 0 && expandable.every((r) => expanded.has(r.id));
   const cell = open?.row.days[open.day];
 
   return (
@@ -91,7 +101,18 @@ export function WorkloadGrid({
           <thead>
             <tr>
               <th className="sticky left-0 z-20 min-w-56 border-b border-r border-stone-200 bg-white px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-stone-500" rowSpan={2}>
-                Person
+                <span className="flex items-center justify-between gap-2">
+                  Person
+                  {expandable.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(allOpen ? new Set() : new Set(expandable.map((r) => r.id)))}
+                      className="text-[11px] font-medium normal-case tracking-normal text-blue-700 hover:underline"
+                    >
+                      {allOpen ? "Collapse all" : "Expand all"}
+                    </button>
+                  )}
+                </span>
               </th>
               {weeks.map((w) => (
                 <th key={w.start} colSpan={w.count} className="border-b border-l border-stone-200 bg-white px-2 py-1.5 text-left text-xs font-semibold text-stone-700">
@@ -118,30 +139,56 @@ export function WorkloadGrid({
             </tr>
           </thead>
           <tbody>
-            {allRows.map((r) => (
-              <tr key={r.id} className={r.id === "unassigned" ? "bg-stone-50" : ""}>
-                <td className="sticky left-0 z-10 border-b border-r border-stone-200 bg-white px-4 py-2">
-                  <span className="block font-medium text-stone-900">{r.name}</span>
-                  {r.role && <span className="block text-xs text-stone-500">{r.role}</span>}
-                </td>
-                {days.map((d) => (
-                  <Day
-                    key={d}
-                    c={r.days[d]}
-                    sunday={new Date(`${d}T00:00:00Z`).getUTCDay() === 0}
-                    unassigned={r.id === "unassigned"}
-                    active={open?.row.id === r.id && open.day === d}
-                    label={`${r.name}, ${date(d, { weekday: "long", month: "short", day: "numeric" })}`}
-                    onOpen={(el) => {
-                      if (open?.row.id === r.id && open.day === d) return setOpen(null);
-                      anchor.current = el;
-                      place(el, r, d);
-                    }}
-                  />
-                ))}
-                {more && r === allRows[0] && <td rowSpan={allRows.length} className="w-4 border-b border-stone-200" />}
-              </tr>
-            ))}
+            {allRows.map((r) => {
+              const isOpen = expanded.has(r.id);
+              return (
+                <Fragment key={r.id}>
+                  <tr className={r.id === "unassigned" ? "bg-stone-50" : ""}>
+                    <td className="sticky left-0 z-10 border-b border-r border-stone-200 bg-white px-2 py-2">
+                      <span className="flex items-start gap-1">
+                        {r.tasks.length ? (
+                          <button
+                            type="button"
+                            onClick={() => toggle(r.id)}
+                            aria-expanded={isOpen}
+                            aria-label={`${isOpen ? "Hide" : "Show"} tasks for ${r.name}`}
+                            className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                          >
+                            <svg viewBox="0 0 16 16" className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M6 3l5 5-5 5" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span className="w-5 shrink-0" />
+                        )}
+                        <span className="min-w-0">
+                          <span className="block font-medium text-stone-900">{r.name}</span>
+                          {r.role && <span className="block text-xs text-stone-500">{r.role}</span>}
+                          {r.tasks.length > 0 && !isOpen && <span className="block text-xs text-stone-400">{r.tasks.length} {r.tasks.length === 1 ? "task" : "tasks"}</span>}
+                        </span>
+                      </span>
+                    </td>
+                    {days.map((d) => (
+                      <Day
+                        key={d}
+                        c={r.days[d]}
+                        sunday={new Date(`${d}T00:00:00Z`).getUTCDay() === 0}
+                        unassigned={r.id === "unassigned"}
+                        active={open?.row.id === r.id && open.day === d}
+                        label={`${r.name}, ${date(d, { weekday: "long", month: "short", day: "numeric" })}`}
+                        onOpen={(el) => {
+                          if (open?.row.id === r.id && open.day === d) return setOpen(null);
+                          anchor.current = el;
+                          place(el, r, d);
+                        }}
+                      />
+                    ))}
+                    {more && <td className="w-4 border-b border-stone-200" />}
+                  </tr>
+                  {isOpen && r.tasks.map((t) => <TaskBar key={`${r.id}-${t.id}`} t={t} row={r} days={days} more={!!more} />)}
+                </Fragment>
+              );
+            })}
             {!allRows.length && (
               <tr>
                 <td colSpan={days.length + 1} className="px-4 py-8 text-center text-sm text-stone-500">No one to show.</td>
@@ -221,5 +268,48 @@ function Day({ c, sunday, unassigned, active, label, onOpen }: { c: DayCell; sun
         </button>
       ) : null}
     </td>
+  );
+}
+
+function TaskBar({ t, row, days, more }: { t: RowTask; row: WorkloadRow; days: string[]; more: boolean }) {
+  const first = days[0];
+  const last = days[days.length - 1];
+  const a = days.indexOf(t.start < first ? first : t.start);
+  const b = days.indexOf(t.end > last ? last : t.end);
+  const shade = (d: string) => {
+    const c = row.days[d];
+    return `${c.holiday ? "bg-amber-50" : c.capacity === 0 && row.id !== "unassigned" ? "wl-hatch" : ""} ${new Date(`${d}T00:00:00Z`).getUTCDay() === 0 ? "border-l border-stone-200" : ""}`;
+  };
+  const span = (from: string, to: string) => (from === to ? date(from, { month: "short", day: "numeric" }) : `${date(from, { month: "short", day: "numeric" })} to ${date(to, { month: "short", day: "numeric" })}`);
+  const cutLeft = t.start < first;
+  const cutRight = t.end > last;
+  const corners = cutLeft && cutRight ? "border-x-0" : cutLeft ? "rounded-r-md border-l-0" : cutRight ? "rounded-l-md border-r-0" : "rounded-md";
+  return (
+    <tr className="bg-white">
+      <td className="sticky left-0 z-10 border-r border-stone-200 bg-white py-1 pl-8 pr-2">
+        <Link href={`/tasks/${t.id}`} className="block max-w-48 truncate text-xs font-medium text-stone-700 hover:underline" title={t.title}>{t.title}</Link>
+        <span className="block max-w-48 truncate text-[11px] text-stone-400" title={t.project}>
+          {t.project}
+          {t.roles?.length ? <span className="text-amber-800"> · Open: {t.roles.join(", ")}</span> : null}
+        </span>
+      </td>
+      {days.slice(0, a).map((d) => (
+        <td key={d} className={shade(d)} />
+      ))}
+      <td colSpan={b - a + 1} className={`relative h-11 p-0 ${new Date(`${days[a]}T00:00:00Z`).getUTCDay() === 0 ? "border-l border-stone-200" : ""}`}>
+        <Link
+          href={`/tasks/${t.id}`}
+          title={`${t.title} · ${t.project} · ${span(t.start, t.end)} · ${h(t.hours)} h${t.roles?.length ? ` · Open: ${t.roles.join(", ")}` : ""}`}
+          className={`absolute inset-x-0.5 inset-y-1 flex items-center gap-1.5 overflow-hidden border border-sky-300 bg-sky-50 px-1.5 text-xs text-sky-950 hover:border-sky-500 hover:bg-sky-100 ${corners}`}
+        >
+          <span className="shrink-0 rounded bg-white px-1 font-semibold tabular-nums ring-1 ring-sky-200">{h(t.hours)}h</span>
+          <span className="truncate font-medium">{t.title}</span>
+        </Link>
+      </td>
+      {days.slice(b + 1).map((d) => (
+        <td key={d} className={shade(d)} />
+      ))}
+      {more && <td />}
+    </tr>
   );
 }
