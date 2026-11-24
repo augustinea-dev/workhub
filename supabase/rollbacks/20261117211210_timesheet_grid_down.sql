@@ -1,4 +1,4 @@
--- Undoes 20261117211210_timesheet_grid. Steps are in CLAUDE.md under Rollbacks.
+-- Undoes 20261117211210_timesheet_grid. Run as one script in the SQL editor, then deploy the before-timesheet-grid tag. Once sure, drop schema backup_timesheet_grid cascade.
 
 drop trigger if exists projects_billable_changed on public.projects;
 drop function if exists public.projects_billable_changed();
