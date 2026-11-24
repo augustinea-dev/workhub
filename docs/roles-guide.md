@@ -282,6 +282,7 @@ Files open in Excel or Google Sheets.
 - **What it shows:** everyone's planned hours, day by day, starting this week and showing 3 weeks. Scroll right (or select **Show 3 more weeks**) to keep going, up to a year. The arrows move a week at a time; **This week** jumps back. Filter by **Team**.
 - **Each day:** the hours planned from task estimates (the same split as Reports: each task's estimate shared evenly among its people and open roles, over its working days from start to due). Blue is within the person's hours for that day, red is over. Weekends are hatched, holidays say **Holiday**, and a day fully taken by logged time off says **Off**.
 - **Select a day** to see its tasks with their hours; each task links to its page.
+- **Expand a person** (the arrow by their name, or **Expand all**) to see each of their tasks as a bar from its start to its due date, with their share of its hours. A bar that runs past the dates shown has a flat edge. Select a bar or task name to open the task.
 - **Unassigned work** (top row): hours on open roles and on tasks with nobody on them. Hidden when filtering by team.
 - Finished tasks, and parent tasks whose subtasks have estimates, aren't counted. Tasks with an estimate but no dates are listed under Unscheduled in Reports.
 - **Users:** can't open it.
