@@ -117,7 +117,7 @@ export function filterAndSortProjects<T extends ProjectLike>(rows: T[], f: Proje
 }
 
 // ---------- tasks (a project's list) ----------
-export const TASK_SORTS = ["due", "status", "assignee"] as const;
+export const TASK_SORTS = ["order", "due", "status", "assignee"] as const;
 export type TaskSort = (typeof TASK_SORTS)[number];
 
 export type TaskFilters = {
@@ -136,7 +136,7 @@ export function parseTaskFilters(p: Params): TaskFilters {
     assignee: one(p, "assignee"),
     status: TASK_STATUSES.some((s) => s.value === status) ? (status as TaskStatus) : "",
     overdue: one(p, "overdue") === "1",
-    sort: (TASK_SORTS as readonly string[]).includes(sort) ? (sort as TaskSort) : "due",
+    sort: (TASK_SORTS as readonly string[]).includes(sort) ? (sort as TaskSort) : "order",
     dir: dirOf(p),
   };
 }
@@ -147,7 +147,7 @@ export function taskFiltersQS(f: TaskFilters, override: Partial<TaskFilters> = {
     assignee: v.assignee,
     status: v.status,
     overdue: v.overdue ? "1" : undefined,
-    sort: v.sort === "due" ? undefined : v.sort,
+    sort: v.sort === "order" ? undefined : v.sort,
     dir: v.dir === "asc" ? undefined : v.dir,
   });
 }
@@ -156,7 +156,7 @@ export function hasTaskFilters(f: TaskFilters): boolean {
   return !!f.assignee || !!f.status || f.overdue;
 }
 
-type TaskLike = { status: TaskStatus; due_date: string | null; assignee_ids: string[] };
+type TaskLike = { status: TaskStatus; due_date: string | null; assignee_ids: string[]; sort_order?: number };
 
 export function taskMatches(t: TaskLike, f: TaskFilters, meId: string, today: string, teams: TeamMembers = {}): boolean {
   return (
@@ -183,6 +183,7 @@ export function compareTasks(f: TaskFilters, people: Profile[]) {
       .sort((a, b) => a.localeCompare(b))
       .join(", ");
   return (a: TaskLike, b: TaskLike): number => {
+    if (f.sort === "order") return ((a.sort_order ?? 0) - (b.sort_order ?? 0)) * (f.dir === "desc" ? -1 : 1);
     const done = Number(a.status === "done") - Number(b.status === "done");
     if (done && f.sort !== "status") return done;
     if (f.sort === "status") return compareText(STATUS_ORDER[a.status], STATUS_ORDER[b.status], f.dir);

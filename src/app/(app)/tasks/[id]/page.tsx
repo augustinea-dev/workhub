@@ -151,6 +151,26 @@ export default async function TaskPage({
     descendants.push(...level);
   }
   const hasKids = new Set(tree.filter((x) => x.parent_task_id).map((x) => x.parent_task_id as string));
+  const levelOf = (taskId: string) => {
+    let n = 0;
+    for (let up = treeById.get(taskId); up?.parent_task_id && n < 6; up = treeById.get(up.parent_task_id)) n++;
+    return n;
+  };
+  let height = 0;
+  for (let level = [id]; level.length; ) {
+    level = tree.filter((x) => x.parent_task_id && level.includes(x.parent_task_id)).map((x) => x.id);
+    if (level.length) height++;
+  }
+  const pathOf = (taskId: string): string => {
+    const x = treeById.get(taskId);
+    return x?.parent_task_id ? `${pathOf(x.parent_task_id)} › ${x.title}` : (x?.title ?? "");
+  };
+  type TreeTask = { id: string; title: string; parent_task_id: string | null; is_milestone?: boolean; assignee_ids?: string[]; open_roles?: unknown[] };
+  const holdsWork = (x: TreeTask) => !hasKids.has(x.id) && ((x.assignee_ids?.length ?? 0) > 0 || (x.open_roles?.length ?? 0) > 0);
+  const parentChoices = (tree as TreeTask[])
+    .filter((x) => x.id !== id && !descendants.includes(x.id) && !x.is_milestone && levelOf(x.id) + 1 + height <= 4 && !(height > 0 && holdsWork(x)))
+    .map((x) => ({ id: x.id, label: pathOf(x.id) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
   const isParent = subtasks.length > 0;
   const { data: childTime } = descendants.length
     ? await supabase.from("time_entries").select("hours").in("task_id", descendants)
@@ -562,6 +582,20 @@ export default async function TaskPage({
                 )}
                 {(rolled.start || rolled.due) && (
                   <p className="-mt-1 text-xs text-stone-500">Calculated from subtasks.</p>
+                )}
+                {!t.is_milestone && (
+                  <div>
+                    <label className="label" htmlFor="parent_task_id">Parent task</label>
+                    <select id="parent_task_id" name="parent_task_id" defaultValue={t.parent_task_id ?? ""} className="input w-full">
+                      <option value="">None (top level)</option>
+                      {parentChoices.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-stone-500">
+                      Moves this task{height ? " and its subtasks" : ""} under another task. If that task has people or time on it, they move onto this one.
+                    </p>
+                  </div>
                 )}
                 {!t.is_milestone && !t.parent_task_id && milestones.length > 0 && (
                   <div>
