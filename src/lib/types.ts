@@ -148,8 +148,10 @@ export type TemplateTask = {
   template_id: string;
   title: string;
   description: string | null;
+  parent_id: string | null;
   start_day: number;
   due_day: number;
+  duration_days: number;
   estimate_hours: number | null;
   is_milestone: boolean;
   milestone_id: string | null;

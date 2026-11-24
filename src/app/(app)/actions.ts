@@ -755,21 +755,49 @@ export async function deleteTask(fd: FormData) {
 function templateTaskFields(fd: FormData, back: string) {
   const title = str(fd, "title");
   if (!title) fail(back, "Enter a task title.");
-  const startDay = int(fd, "start_day");
-  const dueDay = int(fd, "due_day");
-  if (!Number.isInteger(startDay) || startDay < 0) fail(back, "Start day must be 0 or more.");
-  if (!Number.isInteger(dueDay) || dueDay < startDay) fail(back, "Due day can't be before the start day.");
-  const estimate = Number.parseFloat(str(fd, "estimate_hours"));
   const kind = str(fd, "kind");
-  return {
+  const out: Record<string, unknown> = {
     title,
     description: opt(fd, "description"),
-    start_day: startDay,
-    due_day: dueDay,
-    estimate_hours: Number.isFinite(estimate) && estimate >= 0 ? estimate : null,
     is_milestone: kind === "milestone",
     milestone_id: kind.startsWith("in:") ? kind.slice(3) : null,
   };
+  if (fd.has("parent_id")) out.parent_id = opt(fd, "parent_id");
+  if (fd.has("start_day")) {
+    const startDay = int(fd, "start_day");
+    if (!Number.isInteger(startDay) || startDay < 0) fail(back, "Start day must be 0 or more.");
+    out.start_day = startDay;
+  }
+  if (fd.has("duration_days")) {
+    const duration = Number.parseFloat(str(fd, "duration_days"));
+    if (!Number.isFinite(duration) || duration < 0 || Math.round(duration * 2) !== duration * 2) fail(back, "Duration must be 0 or more, in half days.");
+    out.duration_days = duration;
+  }
+  if (fd.has("estimate_hours")) {
+    const estimate = Number.parseFloat(str(fd, "estimate_hours"));
+    out.estimate_hours = Number.isFinite(estimate) && estimate >= 0 ? estimate : null;
+  }
+  return out as { title: string } & Record<string, unknown>;
+}
+
+async function keepMovedTemplateWork(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+  formPeople: string[],
+  formRoles: string[],
+  hadPeople: string[] = [],
+): Promise<string | null> {
+  const { data: now } = await supabase.from("template_task_assignees").select("profile_id").eq("template_task_id", id);
+  const arrived = (now ?? []).map((a) => a.profile_id as string).filter((x) => !hadPeople.includes(x));
+  const e = await syncAssignees(supabase, "template_task_assignees", "template_task_id", id, [...new Set([...formPeople, ...arrived])]);
+  if (e) return e;
+  const { data: slots } = await supabase.from("template_task_role_slots").select("role_id").eq("template_task_id", id);
+  const extra = (slots ?? []).map((r) => r.role_id as string);
+  for (const r of formRoles) {
+    const k = extra.indexOf(r);
+    if (k >= 0) extra.splice(k, 1);
+  }
+  return syncRoleSlots(supabase, "template_task_role_slots", "template_task_id", id, [...formRoles, ...extra]);
 }
 
 export async function createTemplate(fd: FormData) {
@@ -824,9 +852,10 @@ export async function createTemplateTask(fd: FormData) {
     .select("id")
     .single();
   if (error || !created) fail(back, error?.message ?? "Couldn't add the task.");
-  const assignError =
-    (await syncAssignees(supabase, "template_task_assignees", "template_task_id", created.id, assigneeIdsFrom(fd))) ??
-    (await syncRoleSlots(supabase, "template_task_role_slots", "template_task_id", created.id, roleSlotIdsFrom(fd)));
+  const assignError = fields.parent_id
+    ? await keepMovedTemplateWork(supabase, created.id, assigneeIdsFrom(fd), roleSlotIdsFrom(fd))
+    : ((await syncAssignees(supabase, "template_task_assignees", "template_task_id", created.id, assigneeIdsFrom(fd))) ??
+      (await syncRoleSlots(supabase, "template_task_role_slots", "template_task_id", created.id, roleSlotIdsFrom(fd))));
   if (assignError) fail(back, `Added “${fields.title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Added “${fields.title}”.`);
 }
@@ -835,18 +864,26 @@ export async function updateTemplateTask(fd: FormData) {
   await requireAdmin();
   const back = `/templates/${str(fd, "template_id")}`;
   const fields = templateTaskFields(fd, back);
+  const id = str(fd, "id");
   const supabase = await createClient();
+  const { data: before } = await supabase.from("template_tasks").select("parent_id, template_task_assignees(profile_id)").eq("id", id).maybeSingle();
+  const parentChanged = "parent_id" in fields && fields.parent_id !== (before?.parent_id ?? null);
   const { data, error } = await supabase
     .from("template_tasks")
-    .update(fields)
-    .eq("id", str(fd, "id"))
+    .update(parentChanged ? fields : { ...fields, parent_id: undefined })
+    .eq("id", id)
     .eq("version", int(fd, "version"))
     .select("id");
   if (error) fail(back, error.message);
   if (!data?.length) fail(back, CONFLICT);
-  const assignError =
-    (await syncAssignees(supabase, "template_task_assignees", "template_task_id", str(fd, "id"), assigneeIdsFrom(fd))) ??
-    (await syncRoleSlots(supabase, "template_task_role_slots", "template_task_id", str(fd, "id"), roleSlotIdsFrom(fd)));
+  const had = ((before?.template_task_assignees ?? []) as { profile_id: string }[]).map((a) => a.profile_id);
+  const isParentNow = !fd.has("start_day");
+  const assignError = isParentNow
+    ? null
+    : parentChanged
+      ? await keepMovedTemplateWork(supabase, id, assigneeIdsFrom(fd), roleSlotIdsFrom(fd), had)
+      : ((await syncAssignees(supabase, "template_task_assignees", "template_task_id", id, assigneeIdsFrom(fd))) ??
+        (await syncRoleSlots(supabase, "template_task_role_slots", "template_task_id", id, roleSlotIdsFrom(fd))));
   if (assignError) fail(back, `Saved “${fields.title}”, but its assignees couldn't be saved: ${assignError}`);
   done(back, `Saved “${fields.title}”.`);
 }
