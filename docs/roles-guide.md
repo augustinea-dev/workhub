@@ -237,6 +237,18 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 - **Team managers (Admins or Users):** the same Approvals, Return and Reopen for the members of teams they manage, never for their own week. Approvals shows only their team, with a Team filter if they manage more than one.
   - Set each person's **hours per week** on the Admin page (lower it for part-time staff).
 
+## Proofs (test, hidden unless turned on)
+
+**Where:** a **Proofs** card on each task, when proofing is turned on (setting `PROOFING`: `all`, or `admins` for Admins only).
+
+- **Add a proof (Admins and the task's people):** a PDF, PNG, JPG or WebP up to 50 MB. **Upload a new version** keeps earlier versions and their comments, and sets the proof back to In review.
+- **Review (everyone who can see it):** page through the PDF or image, zoom, and click anywhere to pin a numbered comment. Reply, **Resolve** (or Reopen), and delete your own comments (Admins can delete any). Resolved comments hide unless you tick **Show resolved**. Pick an earlier version to see its comments.
+- **Decision (Admins and the project owner):** **Approve**, **Request changes** or **Back to In review**, with who decided and when.
+- Complete or Cancelled projects: no new proofs, versions or decisions; comments still work.
+- Admins can rename and delete a proof (deleting removes its files, versions and comments).
+- **Proofs page** (sidebar): every proof with its project, task, latest version, open comments on that version and status; filter Not approved (default), In review, Changes requested, Approved or All.
+- **Notices** (Inbox, marked Proof): a new version (v2 and later), a new comment or reply, and a decision go to the task's people, the project owner and whoever added the proof (a reply also reaches the comment's author), never to the person who did it. Opening one goes to the proof. Projects in Planning stay quiet.
+
 ## Exports (CSV)
 
 Files open in Excel or Google Sheets.

@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { deleteProof, renameProof } from "../actions";
 import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { ProofUpload } from "@/components/proof-upload";
-import { ProofViewer } from "@/components/proof-viewer";
+import { ProofDecision } from "@/components/proof-decision";
+import { ProofReview, type ReviewComment } from "@/components/proof-review";
 import { Flash } from "@/components/ui";
 import { getPeople, nameOf, sp } from "@/lib/data";
-import { formatDate } from "@/lib/dates";
+import { formatDate, formatTimestamp } from "@/lib/dates";
 import { PROOF_BUCKET, proofingOn, proofStatus, sizeLabel, type Proof, type ProofVersion } from "@/lib/proofing";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -48,11 +49,34 @@ export default async function ProofPage({
   const version = versions.find((v) => v.number === wanted) ?? versions[0];
   const { data: signed } = version ? await supabase.storage.from(PROOF_BUCKET).createSignedUrl(version.storage_path, 60 * 60) : { data: null };
 
+  const { data: commentData } = version
+    ? await supabase.from("proof_comments").select("*").eq("version_id", version.id).order("created_at")
+    : { data: [] };
+  const latestId = versions[0]?.id;
+  const { data: latestOpen } = latestId
+    ? await supabase.from("proof_comments").select("id", { count: "exact" }).eq("version_id", latestId).is("parent_id", null).is("resolved_at", null)
+    : { data: [] };
   const isAdmin = me.role === "admin";
   const project = proof.task.project;
   const closed = project.status === "complete" || project.status === "cancelled";
   const canUpload = !closed && (isAdmin || proof.task.task_assignees.some((a) => a.profile_id === me.id));
   const status = proofStatus(proof.status);
+  const canDecide = !closed && (isAdmin || project.owner_id === me.id);
+  const comments: ReviewComment[] = (
+    (commentData ?? []) as { id: string; parent_id: string | null; author_id: string; body: string; page: number | null; x: number | null; y: number | null; pin: number | null; resolved_at: string | null; created_at: string }[]
+  ).map((c) => ({
+    id: c.id,
+    parent_id: c.parent_id,
+    author: c.author_id === me.id ? "You" : nameOf(people, c.author_id),
+    mine: c.author_id === me.id,
+    body: c.body,
+    page: c.page,
+    x: c.x == null ? null : Number(c.x),
+    y: c.y == null ? null : Number(c.y),
+    pin: c.pin,
+    resolved: !!c.resolved_at,
+    when: formatTimestamp(c.created_at),
+  }));
   const here = `/proofs/${id}`;
 
   return (
@@ -74,7 +98,7 @@ export default async function ProofPage({
       </div>
       <Flash error={sp(query.error)} notice={sp(query.notice)} />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="space-y-6">
         <section className="card min-w-0 overflow-hidden">
           <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 px-4 py-3">
             <span className="text-sm font-semibold">Version</span>
@@ -98,13 +122,29 @@ export default async function ProofPage({
             )}
           </div>
           {version && signed?.signedUrl ? (
-            <ProofViewer key={version.id} url={signed.signedUrl} mime={version.mime_type} fileName={version.file_name} />
+            <ProofReview
+              key={version.id}
+              versionId={version.id}
+              url={signed.signedUrl}
+              mime={version.mime_type}
+              fileName={version.file_name}
+              comments={comments}
+              canDeleteAny={isAdmin}
+              latest={version.id === latestId}
+            />
           ) : (
             <p className="p-6 text-sm text-stone-500">This proof has no file yet.</p>
           )}
         </section>
 
-        <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-3">
+          {canDecide && (
+            <section className="card p-4">
+              <h2 className="mb-1 text-sm font-semibold">Decision</h2>
+              <p className="mb-3 text-xs text-stone-500">Admins and the project owner decide. A new version sets it back to In review.</p>
+              <ProofDecision proofId={proof.id} status={proof.status} openComments={(latestOpen ?? []).length} />
+            </section>
+          )}
           {canUpload && (
             <section className="card p-4">
               <h2 className="mb-1 text-sm font-semibold">Upload a new version</h2>
@@ -112,10 +152,6 @@ export default async function ProofPage({
               <ProofUpload taskId={proof.task.id} proofId={proof.id} />
             </section>
           )}
-          <section className="card p-4 text-sm text-stone-600">
-            <h2 className="mb-2 text-sm font-semibold text-stone-900">Comments and decisions</h2>
-            <p>Pinned comments and the Approve or Request changes buttons are coming next in this test.</p>
-          </section>
           {canUpload && (
             <section className="card p-4">
               <h2 className="mb-3 text-sm font-semibold">Proof details</h2>

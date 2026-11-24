@@ -4,6 +4,7 @@ import { NavLink, TimerBadge } from "@/components/client";
 import { requireProfile } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { getMyTimer } from "@/lib/timer";
+import { proofingOn } from "@/lib/proofing";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const me = await requireProfile();
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             )}
           </NavLink>
           {me.role === "admin" && <NavLink href="/templates">Templates</NavLink>}
+          {proofingOn(me.role) && <NavLink href="/proofs">Proofs</NavLink>}
           {me.role === "admin" && <NavLink href="/workload">Workload</NavLink>}
           {me.role === "admin" && <NavLink href="/reports">Reports</NavLink>}
           {me.role === "admin" && <NavLink href="/admin">Admin</NavLink>}

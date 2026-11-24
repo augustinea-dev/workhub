@@ -1,5 +1,6 @@
 -- Undoes 20261124240000_proofing. First turn proofing off (unset PROOFING in Vercel) and empty the
--- "proofs" bucket in Supabase (Storage, select the bucket, select all, Delete). Then run this as one script.
+-- "proofs" bucket in Supabase (Storage, select the bucket, select all, Delete). Run
+-- 20261124250000_proof_notifications_down.sql first, then this as one script.
 begin;
 
 drop policy if exists "proof files read" on storage.objects;

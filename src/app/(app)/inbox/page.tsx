@@ -47,6 +47,9 @@ export default async function InboxPage() {
                   {n.kind === "budget_alert" && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Budget</span>
                   )}
+                  {n.kind.startsWith("proof_") && (
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900">Proof</span>
+                  )}
                   {n.kind.startsWith("timesheet_") && (
                     <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">Timesheet</span>
                   )}
