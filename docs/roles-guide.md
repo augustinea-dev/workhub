@@ -200,6 +200,7 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
 
 - **Everyone:**
   - **The grid:** one row per task, grouped by project, then the General Time rows (Agency, then Non-Client). Columns are Sunday to Saturday, with totals per row and per day. Type hours into the cells and select **Save week**.
+    - **Which tasks show:** the tasks you're on that aren't finished, plus finished tasks until a week after their due date (or a week after they were finished, whichever is later), so you can still log late hours. Any task you've logged time on that week always shows.
     - Task rows: every open task you're assigned to, anything you logged time on that week, and **Add a task** for any other open task.
     - **Job role** per task row, starting from your main role.
     - Each project's heading shows its **budget bar** (everyone's hours against the task estimates, the same as on the project page). Hours you type count toward it right away, marked "unsaved" until you save, so you can see if the week puts the project over. Projects without estimates show no bar.
@@ -298,6 +299,7 @@ Files open in Excel or Google Sheets.
 
 - **Everyone:** see each client with its active and total projects. Select a client (or **View projects**) to see its projects on the Projects page.
 - **Admins only:** add and rename clients, and set each client's brand used in project names and billing year. **+ New project** on a client opens the new project form with that client picked. **Delete** appears only for a client with no projects; move or delete its projects first. Projects are linked to a client when they're created or edited.
+- **Deactivate a client (Admins):** **Deactivate** keeps the client and all its projects, time and history, but hides it from the client list when creating a project, and no project can be moved to it. It's listed at the bottom marked **Inactive**. **Reactivate** brings it back.
 
 ## Admin page (Admins only)
 

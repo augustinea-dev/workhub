@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createCompany, deleteCompany, updateCompany } from "../actions";
+import { createCompany, deleteCompany, setCompanyActive, updateCompany } from "../actions";
 import { ConfirmDelete, SubmitButton } from "@/components/client";
 import { Empty, Flash, PageHeader } from "@/components/ui";
 import { sp } from "@/lib/data";
@@ -12,6 +12,7 @@ type Row = {
   name: string;
   project_label: string | null;
   fiscal_year_start_month: number | null;
+  active: boolean;
   projects: { id: string; status: string }[];
 };
 
@@ -36,12 +37,14 @@ export default async function ClientsPage({
   const isAdmin = me.role === "admin";
   const editId = isAdmin ? sp(params.edit) : undefined;
   const supabase = await createClient();
-  const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month, projects(id, status)").order("name");
-  const rows = (data ?? []) as unknown as Row[];
+  const { data } = await supabase.from("companies").select("id, name, project_label, fiscal_year_start_month, active, projects(id, status)").order("name");
+  const all = (data ?? []) as unknown as Row[];
+  const rows = [...all.filter((c) => c.active), ...all.filter((c) => !c.active)];
+  const inactiveCount = all.length - all.filter((c) => c.active).length;
 
   return (
     <>
-      <PageHeader title="Clients" subtitle={`${rows.length} client${rows.length === 1 ? "" : "s"}`} />
+      <PageHeader title="Clients" subtitle={`${rows.length - inactiveCount} active client${rows.length - inactiveCount === 1 ? "" : "s"}${inactiveCount ? ` · ${inactiveCount} inactive` : ""}`} />
       <Flash error={sp(params.error)} notice={sp(params.notice)} />
 
       {isAdmin && (
@@ -100,9 +103,10 @@ export default async function ClientsPage({
                     </td>
                   </tr>
                 ) : (
-                  <tr key={c.id} className="hover:bg-stone-50">
+                  <tr key={c.id} className={`hover:bg-stone-50 ${c.active ? "" : "text-stone-500"}`}>
                     <td className="table-cell">
                       <Link href={`/projects?client=${c.id}&status=all`} className="font-medium hover:underline">{c.name}</Link>
+                      {!c.active && <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">Inactive</span>}
                       <p className="mt-0.5 text-xs text-stone-500">
                         {c.project_label ? `Projects named “${c.project_label}” · ` : ""}
                         {c.fiscal_year_start_month ? `Fiscal year from ${MONTHS[c.fiscal_year_start_month - 1]}` : "Calendar year"}
@@ -115,8 +119,15 @@ export default async function ClientsPage({
                     {isAdmin && (
                       <td className="table-cell">
                         <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                          <Link href={`/projects?client=${c.id}&status=all&new=1#new-project`} className="btn px-2.5 py-1 text-xs">+ New project</Link>
+                          {c.active && (
+                            <Link href={`/projects?client=${c.id}&status=all&new=1#new-project`} className="btn px-2.5 py-1 text-xs">+ New project</Link>
+                          )}
                           <Link href={`/clients?edit=${c.id}`} className="btn px-2.5 py-1 text-xs">Edit</Link>
+                          <form action={setCompanyActive}>
+                            <input type="hidden" name="id" value={c.id} />
+                            <input type="hidden" name="active" value={c.active ? "false" : "true"} />
+                            <SubmitButton pendingText="Saving…" className="btn px-2.5 py-1 text-xs">{c.active ? "Deactivate" : "Reactivate"}</SubmitButton>
+                          </form>
                           {c.projects.length === 0 ? (
                             <form action={deleteCompany}>
                               <input type="hidden" name="id" value={c.id} />

@@ -95,11 +95,11 @@ export default async function ProjectsPage({
         <summary className="cursor-pointer text-sm font-semibold">+ New project</summary>
         <form action={createProject} className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <ProjectNameFields
-            clients={companies}
+            clients={companies.filter((c) => c.active)}
             types={projectTypes.filter((t) => t.active)}
             reference={nextReference}
             today={today}
-            defaults={{ company_id: companies.some((c) => c.id === f.client) ? f.client : null }}
+            defaults={{ company_id: companies.some((c) => c.active && c.id === f.client) ? f.client : null }}
             idPrefix="new"
           />
           <div className="grid content-start gap-3">

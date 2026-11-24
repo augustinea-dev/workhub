@@ -49,6 +49,8 @@ export default async function TimePage({
   const requestedWeek = sp(params.week);
   const week = weekStart(requestedWeek && isValidISODate(requestedWeek) ? requestedWeek : todayISO());
   const saturday = addDays(week, 6);
+  const rollOff = addDays(week, -7);
+  const stillOn = `status.neq.done,due_date.gte.${rollOff},completed_at.gte.${rollOff}`;
   const requestedUser = sp(params.user);
   const canView = (id: string) => isAdmin || id === me.id || managed.includes(id);
   const userId = requestedUser && people.some((p) => p.id === requestedUser) && canView(requestedUser) ? requestedUser : me.id;
@@ -78,8 +80,8 @@ export default async function TimePage({
       .from("tasks")
       .select("id, title, project:projects(id, name, title, status, company:companies(name)), task_assignees!inner(profile_id)")
       .eq("task_assignees.profile_id", userId)
-      .neq("status", "done"),
-    supabase.from("tasks").select("id, title, project:projects(id, name, title, status, company:companies(name))").neq("status", "done").order("title").limit(2000),
+      .or(stillOn),
+    supabase.from("tasks").select("id, title, project:projects(id, name, title, status, company:companies(name))").or(stillOn).order("title").limit(2000),
   ]);
   const ts = sheet as Timesheet | null;
   const status = ts?.status ?? "open";
