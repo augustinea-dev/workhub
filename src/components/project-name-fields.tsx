@@ -108,7 +108,19 @@ export function ProjectNameFields({
               ))
             : "Add a title to see the name"}
         </span>
+        {title.trim() && <span className="ml-1 whitespace-nowrap text-xs text-stone-500">({preview.length} characters)</span>}
       </p>
+    </div>
+  );
+}
+
+export function CustomNameInput({ defaultValue }: { defaultValue: string }) {
+  const [name, setName] = useState(defaultValue);
+  return (
+    <div>
+      <label className="label" htmlFor="name">Custom name</label>
+      <input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} className="input w-full" />
+      <p className="mt-1 text-xs text-stone-500" aria-live="polite">{name.length} characters</p>
     </div>
   );
 }
