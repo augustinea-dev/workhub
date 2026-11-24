@@ -8,6 +8,7 @@ import {
   available,
   BREAKDOWNS,
   buildReport,
+  buildTaskReport,
   loadProjectTotals,
   loadReportData,
   MAX_RANGE_DAYS,
@@ -18,6 +19,7 @@ import {
   VIEWS,
   type Cell,
   type Period,
+  type TaskRow,
 } from "@/lib/utilization";
 
 const h = (n: number) => (Math.abs(n) < 0.005 ? "0" : (+n.toFixed(1)).toString());
@@ -83,6 +85,54 @@ function GridCells({ cells, periods, today, open }: { cells: Record<string, Cell
   );
 }
 
+function TaskTable({ rows }: { rows: TaskRow[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[860px]">
+        <thead>
+          <tr>
+            <th className="table-head">Task and person</th>
+            <th className="table-head text-right" title="The person's share of the task estimate">Allocated</th>
+            <th className="table-head text-right" title="Their share spread over the task's working days, within these dates">Planned in range</th>
+            <th className="table-head text-right">Worked in range</th>
+            <th className="table-head text-right" title="All hours they've logged on the task">Worked to date</th>
+            <th className="table-head" title="Worked to date ÷ allocated">Used</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.flatMap((r, i) => {
+            const first = i === 0 || rows[i - 1].taskId !== r.taskId;
+            const used = r.allocated ? (r.toDate / r.allocated) * 100 : null;
+            const open = !r.personId;
+            return [
+              ...(first
+                ? [
+                    <tr key={`${r.taskId}-head`} className="border-b border-stone-200 bg-stone-50">
+                      <td colSpan={6} className="px-4 py-2">
+                        <Link href={`/tasks/${r.taskId}`} className="font-semibold hover:underline">{r.title}</Link>
+                        <Link href={`/projects/${r.projectId}`} className="ml-2 text-xs text-stone-500 hover:underline">{r.project}</Link>
+                      </td>
+                    </tr>,
+                  ]
+                : []),
+              <tr key={`${r.taskId}-${r.personId ?? r.who}`} className="border-b border-stone-100 hover:bg-stone-50">
+                <td className={`table-cell pl-8 ${open ? "text-amber-800" : "text-stone-700"}`}>{r.who}</td>
+                <td className="table-cell text-right tabular-nums">{r.allocated != null ? h(r.allocated) : <span className="text-xs text-stone-400">Not allocated</span>}</td>
+                <td className="table-cell text-right tabular-nums">{h(r.planned)}</td>
+                <td className="table-cell text-right tabular-nums">{open ? "" : h(r.worked)}</td>
+                <td className="table-cell text-right tabular-nums">{open ? "" : h(r.toDate)}</td>
+                <td className={`table-cell tabular-nums ${used != null && used > 100 ? "font-semibold text-red-700" : used != null && used >= 75 ? "text-amber-800" : ""}`}>
+                  {open ? "" : pct(used)}
+                </td>
+              </tr>,
+            ];
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default async function ReportsPage({
   searchParams,
 }: {
@@ -93,22 +143,32 @@ export default async function ReportsPage({
   const today = todayISO();
   const range = resolveRange(sp(params.range), sp(params.from), sp(params.to), today);
   const view = pick(sp(params.view), VIEWS, "person");
-  const by = view === "project" ? "total" : pick(sp(params.by), BREAKDOWNS, "total");
+  const by = view === "project" || view === "task" ? "total" : pick(sp(params.by), BREAKDOWNS, "total");
   const tooLong = daysBetween(range.from, range.to) > MAX_RANGE_DAYS;
   const teamId = sp(params.team) ?? "";
 
   const [people, teams, roles] = await Promise.all([getPeople(), getTeams(), getJobRoles()]);
   const activeTeams = teams.filter((t) => t.active);
   const team = activeTeams.find((t) => t.id === teamId);
-  const report = tooLong
-    ? null
-    : buildReport({ people, roles, data: await loadReportData(range.from, range.to), from: range.from, to: range.to, by, teamIds: team ? team.member_ids : null });
+  const activePeople = people.filter((p) => p.active).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const personId = view === "task" ? (activePeople.find((p) => p.id === sp(params.person))?.id ?? null) : null;
+  const data = tooLong ? null : await loadReportData(range.from, range.to);
+  const report = data ? buildReport({ people, roles, data, from: range.from, to: range.to, by, teamIds: team ? team.member_ids : null }) : null;
+  const taskRows =
+    data && view === "task"
+      ? await buildTaskReport({ people, roles, data, from: range.from, to: range.to, teamIds: team ? team.member_ids : null, personId })
+      : [];
   if (report && view === "project") {
     const totals = await loadProjectTotals(report.projectRows.map((r) => r.id));
     for (const r of report.projectRows) r.toDate = totals.get(r.id) ?? 0;
   }
 
-  const base: Record<string, string> = { range: range.preset, ...(range.preset === "custom" ? { from: range.from, to: range.to } : {}), ...(team ? { team: team.id } : {}) };
+  const base: Record<string, string> = {
+    range: range.preset,
+    ...(range.preset === "custom" ? { from: range.from, to: range.to } : {}),
+    ...(team ? { team: team.id } : {}),
+    ...(personId ? { person: personId } : {}),
+  };
   const href = (o: Record<string, string>) => `/reports?${new URLSearchParams({ ...base, view, ...(by !== "total" ? { by } : {}), ...o })}`;
   const exportQs = new URLSearchParams({ ...base, view, by });
   const grid = by !== "total";
@@ -145,7 +205,7 @@ export default async function ReportsPage({
           ))}
         </nav>
 
-        <FilterForm key={`${range.preset}-${range.from}-${range.to}-${teamId}-${view}-${by}`} className="flex flex-wrap items-end gap-2 border-b border-stone-200 bg-stone-50 px-4 py-3">
+        <FilterForm key={`${range.preset}-${range.from}-${range.to}-${teamId}-${view}-${by}-${personId ?? ""}`} className="flex flex-wrap items-end gap-2 border-b border-stone-200 bg-stone-50 px-4 py-3">
           <input type="hidden" name="view" value={view} />
           <div>
             <label className="label" htmlFor="r_range">Dates</label>
@@ -168,7 +228,7 @@ export default async function ReportsPage({
               <button type="submit" className="btn">Apply</button>
             </>
           )}
-          {view !== "project" && (
+          {view !== "project" && view !== "task" && (
             <div>
               <label className="label" htmlFor="r_by">Break down</label>
               <select id="r_by" name="by" defaultValue={by} className="input">
@@ -189,13 +249,30 @@ export default async function ReportsPage({
               </select>
             </div>
           )}
-          {(range.preset !== "last_month" || team || by !== "total") && (
+          {view === "task" && (
+            <div>
+              <label className="label" htmlFor="r_person">Person</label>
+              <select id="r_person" name="person" defaultValue={personId ?? ""} className="input">
+                <option value="">Everyone</option>
+                {activePeople.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {(range.preset !== "last_month" || team || by !== "total" || personId) && (
             <Link href={`/reports?view=${view}`} className="btn">Reset</Link>
           )}
         </FilterForm>
 
         {!report ? (
           <Empty>Pick a range of a year or less.</Empty>
+        ) : view === "task" ? (
+          taskRows.length === 0 ? (
+            <Empty>No planned or logged hours on any task in these dates.</Empty>
+          ) : (
+            <TaskTable rows={taskRows} />
+          )
         ) : view === "project" ? (
           report.projectRows.length === 0 ? (
             <Empty>No planned or logged hours on any project in these dates.</Empty>

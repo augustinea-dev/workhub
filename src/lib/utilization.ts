@@ -17,6 +17,7 @@ export const VIEWS = [
   { value: "person", label: "By person" },
   { value: "role", label: "By job role" },
   { value: "project", label: "By project" },
+  { value: "task", label: "By task" },
 ] as const;
 export type View = (typeof VIEWS)[number]["value"];
 
@@ -112,7 +113,7 @@ async function pages<T>(build: (start: number, end: number) => PromiseLike<{ dat
   }
 }
 
-type Entry = { user_id: string; project_id: string | null; work_date: string; hours: number | string; hour_type: HourType; category: { kind: string; name: string } | null };
+type Entry = { user_id: string; project_id: string | null; task_id: string | null; work_date: string; hours: number | string; hour_type: HourType; category: { kind: string; name: string } | null };
 type PlanTask = {
   id: string;
   title: string;
@@ -133,7 +134,7 @@ export async function loadReportData(from: string, to: string) {
     pages<Entry>((a, b) =>
       supabase
         .from("time_entries")
-        .select("user_id, project_id, work_date, hours, hour_type, category:time_categories(kind, name)")
+        .select("user_id, project_id, task_id, work_date, hours, hour_type, category:time_categories(kind, name)")
         .gte("work_date", from)
         .lte("work_date", to)
         .order("id")
@@ -350,4 +351,124 @@ export function buildReport(opts: {
 
   unscheduled.sort((a, b) => a.project.localeCompare(b.project) || a.title.localeCompare(b.title));
   return { periods: per, personRows, roleRows, totals, projectRows, unscheduled, workDays: workingDaysIn(from, to, holidays).length };
+}
+
+export type TaskRow = {
+  taskId: string;
+  title: string;
+  projectId: string;
+  project: string;
+  who: string;
+  personId: string | null;
+  allocated: number | null;
+  planned: number;
+  worked: number;
+  toDate: number;
+};
+
+async function chunks<T>(ids: string[], load: (part: string[]) => Promise<T[]>): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += 100) out.push(...(await load(ids.slice(i, i + 100))));
+  return out;
+}
+
+export async function buildTaskReport(opts: {
+  people: Profile[];
+  roles: JobRole[];
+  data: Awaited<ReturnType<typeof loadReportData>>;
+  from: string;
+  to: string;
+  teamIds: string[] | null;
+  personId: string | null;
+}): Promise<TaskRow[]> {
+  const { people, roles, data, from, to, teamIds, personId } = opts;
+  const { holidays } = data;
+  const show = (id: string) => (!teamIds || teamIds.includes(id)) && (!personId || personId === id);
+  const showOpen = !teamIds && !personId;
+  const nameOf = (id: string) => people.find((p) => p.id === id)?.full_name ?? "Someone";
+  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? "Role";
+  const projectName = new Map(data.projects.map((p) => [p.id, p.title || p.name]));
+  const rows = new Map<string, TaskRow>();
+  const info = new Map<string, { title: string; projectId: string }>();
+  const rowFor = (taskId: string, key: string, who: string, pid: string | null) => {
+    const k = `${taskId}|${key}`;
+    if (!rows.has(k)) {
+      const t = info.get(taskId)!;
+      rows.set(k, { taskId, title: t.title, projectId: t.projectId, project: projectName.get(t.projectId) ?? "", who, personId: pid, allocated: null, planned: 0, worked: 0, toDate: 0 });
+    }
+    return rows.get(k)!;
+  };
+
+  const hasEstimatedChild = new Set(data.tasks.filter((t) => t.parent_task_id).map((t) => t.parent_task_id as string));
+  for (const t of data.tasks) info.set(t.id, { title: t.title, projectId: t.project_id });
+  for (const t of data.tasks) {
+    if (hasEstimatedChild.has(t.id)) continue;
+    const est = Number(t.estimate_hours);
+    if (!est) continue;
+    const start = t.start_date ?? t.due_date;
+    const end = t.due_date ?? t.start_date;
+    if (!start || !end) continue;
+    const [a, b] = start <= end ? [start, end] : [end, start];
+    if (b < from || a > to) continue;
+    let span = workingDaysIn(a, b, holidays);
+    if (!span.length) span = [b];
+    const shares = t.task_assignees.length + t.task_role_slots.length || 1;
+    const share = est / shares;
+    const inRange = span.filter((d) => d >= from && d <= to).length;
+    const planned = (share / span.length) * inRange;
+    for (const as of t.task_assignees) {
+      if (!show(as.profile_id)) continue;
+      const r = rowFor(t.id, as.profile_id, nameOf(as.profile_id), as.profile_id);
+      r.allocated = share;
+      r.planned = planned;
+    }
+    if (!showOpen) continue;
+    const counts = new Map<string, number>();
+    for (const sl of t.task_role_slots) counts.set(sl.role_id, (counts.get(sl.role_id) ?? 0) + 1);
+    for (const [rid, n] of counts) {
+      const r = rowFor(t.id, `role:${rid}`, `Open: ${roleName(rid)}${n > 1 ? ` (${n})` : ""}`, null);
+      r.allocated = share * n;
+      r.planned = planned * n;
+    }
+    if (!t.task_assignees.length && !t.task_role_slots.length) {
+      const r = rowFor(t.id, "none", "No one assigned", null);
+      r.allocated = share;
+      r.planned = planned;
+    }
+  }
+
+  const workedIds = new Set<string>();
+  for (const e of data.entries) if (e.task_id && e.hour_type !== "pto" && show(e.user_id)) workedIds.add(e.task_id);
+  const missing = [...workedIds].filter((id) => !info.has(id));
+  const supabase = await createClient();
+  if (missing.length) {
+    const extra = await chunks(missing, async (part) => {
+      const { data: d } = await supabase.from("tasks").select("id, title, project_id").in("id", part);
+      return (d ?? []) as { id: string; title: string; project_id: string }[];
+    });
+    for (const t of extra) info.set(t.id, { title: t.title, projectId: t.project_id });
+  }
+  for (const e of data.entries) {
+    if (!e.task_id || e.hour_type === "pto" || !show(e.user_id) || !info.has(e.task_id)) continue;
+    rowFor(e.task_id, e.user_id, nameOf(e.user_id), e.user_id).worked += Number(e.hours);
+  }
+
+  const ids = [...new Set([...rows.values()].map((r) => r.taskId))];
+  const totals = await chunks(ids, (part) =>
+    pages<{ task_id: string; user_id: string; hours: number | string }>((a, b) =>
+      supabase.from("time_entries").select("task_id, user_id, hours").in("task_id", part).neq("hour_type", "pto").order("id").range(a, b),
+    ),
+  );
+  for (const e of totals) {
+    const r = rows.get(`${e.task_id}|${e.user_id}`);
+    if (r) r.toDate += Number(e.hours);
+  }
+
+  return [...rows.values()].sort(
+    (x, y) =>
+      x.project.localeCompare(y.project) ||
+      x.title.localeCompare(y.title) ||
+      (x.personId ? 0 : 1) - (y.personId ? 0 : 1) ||
+      x.who.localeCompare(y.who),
+  );
 }
