@@ -265,10 +265,11 @@ Files open in Excel or Google Sheets.
 
 **Where:** Reports in the sidebar. Users don't see the link, and the page and its export turn them away.
 
-- **Utilization**, with three views:
+- **Utilization**, with four views:
   - **By person:** one row per person.
   - **By job role:** people grouped under their main role, with a total per role. Open roles on tasks show as hours "not yet assigned" for that role.
   - **By project:** each project's estimate, planned and worked hours in the dates, hours logged to date and budget used (the same number as the project's budget bar).
+  - **By task:** each task with its people under it. **Allocated** is the person's share of the estimate (the same number as "allocated" on their timesheet), then planned and worked hours in the dates, everything they've logged on it to date, and **Used** (worked to date ÷ allocated, amber from 75%, red over 100%). Hours logged by someone not on the task show as "Not allocated". Open roles and tasks with nobody on them are listed too. Filter by **Person** as well as team.
 - **What the numbers mean:**
   - **Available:** the person's hours per week spread over the working days in the dates (weekends and holidays left out), minus PTO they logged.
   - **Planned:** each task's estimate spread evenly over the working days from its start to its due date, split equally among its people and open roles. A task with only one date puts all its hours on that day. A parent task whose subtasks have estimates is counted through the subtasks.
@@ -278,7 +279,7 @@ Files open in Excel or Google Sheets.
 - **Break down** by week or month to see each period side by side. Each cell shows planned ÷ available, the hours, and what was worked so far.
 - **Unscheduled:** open tasks with estimates but no dates are listed below the report, since they can't be placed on the calendar.
 - **Filters:** this, last or next week; this, last or next month; custom dates; and a team.
-- **Export CSV** follows the view, dates, team and breakdown.
+- **Export CSV** follows the view, dates, team, person and breakdown.
 
 ## Workload (Admins only)
 

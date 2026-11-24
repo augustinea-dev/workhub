@@ -7,6 +7,7 @@ import {
   available,
   BREAKDOWNS,
   buildReport,
+  buildTaskReport,
   loadProjectTotals,
   loadReportData,
   MAX_RANGE_DAYS,
@@ -30,19 +31,40 @@ export async function GET(request: NextRequest) {
     return new Response("Pick a range of a year or less.", { status: 400 });
   }
   const view = pick(get("view"), VIEWS, "person");
-  const by = view === "project" ? "total" : pick(get("by"), BREAKDOWNS, "total");
+  const by = view === "project" || view === "task" ? "total" : pick(get("by"), BREAKDOWNS, "total");
   const [people, teams, roles] = await Promise.all([getPeople(), getTeams(), getJobRoles()]);
   const team = teams.find((t) => t.active && t.id === q.get("team"));
+  const data = await loadReportData(range.from, range.to);
+  const person = view === "task" ? (people.find((p) => p.active && p.id === q.get("person")) ?? null) : null;
   const report = buildReport({
     people,
     roles,
-    data: await loadReportData(range.from, range.to),
+    data,
     from: range.from,
     to: range.to,
     by,
     teamIds: team ? team.member_ids : null,
   });
-  const file = `utilization-${view}-${range.from}-to-${range.to}${team ? `-${team.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : ""}.csv`;
+  const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const file = `utilization-${view}-${range.from}-to-${range.to}${team ? `-${slug(team.name)}` : ""}${person ? `-${slug(person.full_name)}` : ""}.csv`;
+
+  if (view === "task") {
+    const rows = await buildTaskReport({ people, roles, data, from: range.from, to: range.to, teamIds: team ? team.member_ids : null, personId: person?.id ?? null });
+    return csvResponse(
+      file,
+      ["Project", "Task", "Person", "Allocated", "Planned in range", "Worked in range", "Worked to date", "Used %"],
+      rows.map((r) => [
+        r.project,
+        r.title,
+        r.who,
+        r.allocated != null ? n(r.allocated) : "",
+        n(r.planned),
+        r.personId ? n(r.worked) : "",
+        r.personId ? n(r.toDate) : "",
+        r.personId && r.allocated ? p((r.toDate / r.allocated) * 100) : "",
+      ]),
+    );
+  }
 
   if (view === "project") {
     const totals = await loadProjectTotals(report.projectRows.map((r) => r.id));
