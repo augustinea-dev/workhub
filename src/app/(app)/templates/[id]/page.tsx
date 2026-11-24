@@ -52,16 +52,18 @@ function TaskFields({
         </div>
       )}
       <div>
-        <label className="label" htmlFor={`start-${suffix}`}>Start day</label>
-        <input id={`start-${suffix}`} name="start_day" type="number" min="0" step="1" required disabled={isParent} defaultValue={task?.start_day ?? 0} className={locked} />
+        <label className="label" htmlFor={`start-${suffix}`}>Starts on day</label>
+        <input id={`start-${suffix}`} name="start_day" type="number" min="0" step="1" required disabled={isParent} defaultValue={task?.start_day ?? 0} aria-describedby={`start-help-${suffix}`} className={`${locked} no-spin`} />
+        <p id={`start-help-${suffix}`} className="mt-1 text-xs text-stone-500">Working days after the project starts (0 = first day)</p>
       </div>
       <div>
-        <label className="label" htmlFor={`dur-${suffix}`}>Pln Dur (days)</label>
-        <input id={`dur-${suffix}`} name="duration_days" type="number" min="0" step="0.5" required disabled={isParent} defaultValue={task?.duration_days ?? 1} className={locked} />
+        <label className="label" htmlFor={`dur-${suffix}`}>Planned Duration (days)</label>
+        <input id={`dur-${suffix}`} name="duration_days" type="number" min="0" step="0.5" required disabled={isParent} defaultValue={task?.duration_days ?? 1} aria-describedby={`dur-help-${suffix}`} className={`${locked} no-spin`} />
+        <p id={`dur-help-${suffix}`} className="mt-1 text-xs text-stone-500">Half days allowed, like 0.5</p>
       </div>
       <div>
-        <label className="label" htmlFor={`est-${suffix}`}>Pln Hours</label>
-        <input id={`est-${suffix}`} name="estimate_hours" type="number" min="0" step="0.25" disabled={isParent} defaultValue={task?.estimate_hours ?? ""} className={locked} />
+        <label className="label" htmlFor={`est-${suffix}`}>Planned Hours</label>
+        <input id={`est-${suffix}`} name="estimate_hours" type="number" min="0" step="0.25" disabled={isParent} defaultValue={task?.estimate_hours ?? ""} className={`${locked} no-spin`} />
       </div>
       <div>
         <label className="label" htmlFor={`kind-${suffix}`}>Type</label>
@@ -81,7 +83,7 @@ function TaskFields({
       </div>
       {isParent ? (
         <p className="rounded-md bg-stone-50 px-3 py-2 text-xs text-stone-600 md:col-span-full">
-          This task has subtasks, so its start, duration and hours are calculated from them, and people and open roles go on the subtasks.
+          This task has subtasks, so its start day, duration and hours are calculated from them, and people and open roles go on the subtasks.
         </p>
       ) : (
         <>
@@ -221,8 +223,8 @@ export default async function TemplatePage({
                     <th className="table-head w-10">#</th>
                     <th className="table-head">Name</th>
                     <th className="table-head">Assignments</th>
-                    <th className="table-head text-right">Pln Dur</th>
-                    <th className="table-head text-right">Pln Hours</th>
+                    <th className="table-head text-right">Planned Duration</th>
+                    <th className="table-head text-right">Planned Hours</th>
                     <th className="table-head">Dates</th>
                     <th className="table-head"><span className="sr-only">Actions</span></th>
                   </tr>
