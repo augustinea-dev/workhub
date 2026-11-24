@@ -20,7 +20,7 @@ type OpenSlot = {
     title: string;
     status: TaskStatus;
     due_date: string | null;
-    project: { id: string; name: string; company: { name: string } | null } | null;
+    project: { id: string; name: string; status: string; company: { name: string } | null } | null;
     task_assignees: { profile_id: string }[];
   } | null;
 };
@@ -64,6 +64,7 @@ export default async function MyWorkPage({
       "id, title, status, due_date, version, project:projects!inner(id, name, owner_id, dropbox_url, company:companies(name)), task_assignees(profile_id)",
     )
     .eq("status", "in_review")
+    .in("project.status", ["active", "on_hold"])
     .order("due_date", { ascending: true, nullsFirst: false });
   if (!isAdmin) reviewQuery = reviewQuery.eq("project.owner_id", me.id);
 
@@ -71,9 +72,10 @@ export default async function MyWorkPage({
     supabase
       .from("tasks")
       .select(
-        "id, title, status, due_date, version, is_milestone, project:projects(id, name, company:companies(id, name)), parent:parent_task_id(id, title), task_assignees!inner(profile_id)",
+        "id, title, status, due_date, version, is_milestone, project:projects!inner(id, name, company:companies(id, name)), parent:parent_task_id(id, title), task_assignees!inner(profile_id)",
       )
       .eq("task_assignees.profile_id", me.id)
+      .in("project.status", ["active", "on_hold"])
       .neq("status", "done")
       .order("due_date", { ascending: true, nullsFirst: false }),
     supabase
@@ -97,11 +99,11 @@ export default async function MyWorkPage({
   const { data: slotData } = myRoleIds.length
     ? await supabase
         .from("task_role_slots")
-        .select("id, role_id, task:tasks(id, title, status, due_date, project:projects(id, name, company:companies(name)), task_assignees(profile_id))")
+        .select("id, role_id, task:tasks(id, title, status, due_date, project:projects(id, name, status, company:companies(name)), task_assignees(profile_id))")
         .in("role_id", myRoleIds)
     : { data: [] };
   const openWork = ((slotData ?? []) as unknown as OpenSlot[])
-    .filter((s) => s.task && s.task.status !== "done" && !s.task.task_assignees.some((a) => a.profile_id === me.id))
+    .filter((s) => s.task && s.task.status !== "done" && ["active", "on_hold"].includes(s.task.project?.status ?? "") && !s.task.task_assignees.some((a) => a.profile_id === me.id))
     .sort((a, b) => (a.task!.due_date ?? "9999").localeCompare(b.task!.due_date ?? "9999"));
 
   const mine = (tasks ?? []) as unknown as Row[];

@@ -23,6 +23,7 @@ export function buildWorkload(opts: {
   for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
   const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? "Role";
   const projectName = new Map(data.projects.map((p) => [p.id, p.title || p.name]));
+  const closedProjects = new Set(data.projects.filter((p) => p.status === "complete" || p.status === "cancelled").map((p) => p.id));
 
   const blankDays = (weekly: number) =>
     Object.fromEntries(
@@ -56,7 +57,7 @@ export function buildWorkload(opts: {
   const hasEstimatedChild = new Set(data.tasks.filter((t) => t.parent_task_id).map((t) => t.parent_task_id as string));
   let unscheduled = 0;
   for (const t of data.tasks) {
-    if (hasEstimatedChild.has(t.id) || t.status === "done") continue;
+    if (hasEstimatedChild.has(t.id) || t.status === "done" || closedProjects.has(t.project_id)) continue;
     const est = Number(t.estimate_hours);
     if (!est) continue;
     const start = t.start_date ?? t.due_date;

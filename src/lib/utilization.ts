@@ -126,7 +126,7 @@ type PlanTask = {
   task_assignees: { profile_id: string }[];
   task_role_slots: { role_id: string }[];
 };
-type ProjectInfo = { id: string; name: string; title: string | null; company: { name: string } | null };
+type ProjectInfo = { id: string; name: string; title: string | null; status: string; company: { name: string } | null };
 
 export async function loadReportData(from: string, to: string) {
   const supabase = await createClient();
@@ -148,7 +148,7 @@ export async function loadReportData(from: string, to: string) {
         .order("id")
         .range(a, b),
     ),
-    supabase.from("projects").select("id, name, title, company:companies(name)"),
+    supabase.from("projects").select("id, name, title, status, company:companies(name)"),
     supabase.from("holidays").select("day"),
   ]);
   return {

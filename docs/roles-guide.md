@@ -80,6 +80,14 @@ Every project name is built from its parts, the same way as in Workfront: **refe
   - Delete the project and its tasks.
   - **Create Dropbox folder** (in Project details) for a project with no folder link yet, once Dropbox is connected.
 
+## Project statuses
+
+What each project status does (set by Admins under **Edit project**):
+
+- **Planning:** for setting up a project. Notifications about it are paused (no assignment, mention or budget notices), it's not on anyone's My Work, it doesn't appear on timesheets, and time can't be logged on it. It does show on the Workload page. When an Admin sets it to **Active**, each person on it gets one notice, for example "You're on 6 tasks in Homepage refresh".
+- **Active** and **On hold:** everything works as normal.
+- **Complete** and **Cancelled:** read only. Updates and comments can still be posted. Tasks, people and time can't change, and only the status and custom name can be edited (so it can still be renamed for billing). The project leaves My Work and the Workload page. On timesheets its rows stay, locked, for two weeks after the status changed, then roll off. To change anything else, an Admin sets it back to Active first.
+
 ## Board
 
 **Where:** a project page, then **Board** at the top right of Tasks.

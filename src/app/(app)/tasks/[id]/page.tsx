@@ -106,7 +106,7 @@ export default async function TaskPage({
     supabase
       .from("tasks")
       .select(
-        "*, task_assignees(profile_id, as_role_id), task_role_slots(id, role_id), project:projects(id, name, dropbox_url, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id), task_role_slots(id, role_id))), parent:parent_task_id(id, title)",
+        "*, task_assignees(profile_id, as_role_id), task_role_slots(id, role_id), project:projects(id, name, status, dropbox_url, company:companies(name), tasks(id, title, status, due_date, is_milestone, milestone_id, task_assignees(profile_id), task_role_slots(id, role_id))), parent:parent_task_id(id, title)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -158,7 +158,10 @@ export default async function TaskPage({
   const mine = entries.filter((e) => e.user_id === me.id).reduce((s, e) => s + Number(e.hours), 0);
   const estimate = t.estimate_hours != null ? Number(t.estimate_hours) : null;
   const here = `/tasks/${id}`;
-  const editing = isAdmin && sp(query.edit) === "1";
+  const projectStatus = (raw.project as { status?: string }).status ?? "active";
+  const frozen = projectStatus === "complete" || projectStatus === "cancelled";
+  const noTime = frozen || projectStatus === "planning";
+  const editing = isAdmin && !frozen && sp(query.edit) === "1";
   const today = todayISO();
   const timer = await getMyTimer();
   const isAssignee = t.assignee_ids.includes(me.id);
@@ -262,8 +265,15 @@ export default async function TaskPage({
         {t.due_date ? <>Due {dueText}</> : dueText}
       </p>
       <Flash error={sp(query.error)} notice={sp(query.notice)} />
+      {noTime && (
+        <div role="status" className="mb-4 rounded-lg border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-700">
+          {frozen
+            ? `This project is ${projectStatus === "complete" ? "Complete" : "Cancelled"}, so this task is read only. Updates can still be posted.`
+            : "This project is in Planning, so time can't be logged yet."}
+        </div>
+      )}
 
-      {canChangeStatus(me, t) && !editing && (
+      {canChangeStatus(me, t) && !editing && !frozen && (
         <section className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <h2 className="text-sm font-semibold">{isAssignee ? "Your status" : "Status"}</h2>
@@ -425,11 +435,11 @@ export default async function TaskPage({
                   })}
                 </ul>
               )}
-              {isAdmin && addSubtask}
+              {isAdmin && !frozen && addSubtask}
             </section>
           )}
 
-          {canHaveSubtasks && subtasks.length === 0 && isAdmin && <section className="card overflow-hidden">{addSubtask}</section>}
+          {canHaveSubtasks && subtasks.length === 0 && isAdmin && !frozen && <section className="card overflow-hidden">{addSubtask}</section>}
 
           <section className="card">
             <h2 className="border-b border-stone-200 px-4 py-3 text-sm font-semibold">
@@ -484,13 +494,14 @@ export default async function TaskPage({
                 Time <span className="font-normal text-stone-400">· {hrs(logged)} logged</span>
                 {estimate != null && <span className="font-normal text-stone-400"> of {hrs(estimate)} planned</span>}
               </h2>
-              <TimerButton taskId={id} runningTaskId={timer?.task_id ?? null} redirectTo={here} />
+              {!noTime && <TimerButton taskId={id} runningTaskId={timer?.task_id ?? null} redirectTo={here} />}
             </div>
             {timeRows.length === 0 ? (
               <Empty>No time logged on this task yet.</Empty>
             ) : (
               <TimeEntryTable rows={timeRows} meId={me.id} isAdmin={isAdmin} redirectTo={here} second="person" />
             )}
+            {!noTime && (
             <form action={logTime} className="border-t border-stone-200 bg-stone-50 p-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Log time</p>
               <div className="flex flex-wrap gap-2">
@@ -502,6 +513,7 @@ export default async function TaskPage({
                 <SubmitButton pendingText="Logging…" className="btn-primary shrink-0">Log time</SubmitButton>
               </div>
             </form>
+            )}
           </section>
         </div>
 
@@ -598,7 +610,7 @@ export default async function TaskPage({
               <InfoCard
                 title="Details"
                 action={
-                  isAdmin && (
+                  isAdmin && !frozen && (
                     <Link href={`${here}?edit=1`} className="btn px-2.5 py-1 text-xs">
                       Edit task
                     </Link>
@@ -637,14 +649,14 @@ export default async function TaskPage({
                         return (
                           <li key={slot.id} className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">{roleName(slot.role_id) ?? "Role"}</span>
-                            {!isDone && myRoleIds.includes(slot.role_id) && !isAssignee && (
+                            {!isDone && !frozen && myRoleIds.includes(slot.role_id) && !isAssignee && (
                               <form action={takeRoleTask}>
                                 <input type="hidden" name="slot_id" value={slot.id} />
                                 <input type="hidden" name="redirect_to" value={here} />
                                 <SubmitButton className="btn px-2.5 py-1 text-xs" pendingText="Taking…">Take it</SubmitButton>
                               </form>
                             )}
-                            {isAdmin && (
+                            {isAdmin && !frozen && (
                               <form action={assignRoleSlot} className="flex items-center gap-1">
                                 <input type="hidden" name="slot_id" value={slot.id} />
                                 <input type="hidden" name="redirect_to" value={here} />
