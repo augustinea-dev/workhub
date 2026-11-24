@@ -81,8 +81,8 @@ export function ProofReview({
             }}
             aria-label={`Comment ${p.pin}`}
             className={`absolute z-10 grid h-7 w-7 -translate-x-1/2 -translate-y-full place-items-center rounded-full rounded-bl-none border-2 border-white text-xs font-bold text-white shadow-md transition-transform hover:scale-110 ${
-              p.resolved ? "bg-stone-400" : "bg-blue-600"
-            } ${selected === p.id ? "scale-110 ring-2 ring-blue-300" : ""}`}
+              p.resolved ? "bg-stone-400" : "bg-sky-600"
+            } ${selected === p.id ? "scale-110 ring-2 ring-sky-300" : ""}`}
             style={{ left: `${(p.x ?? 0) * 100}%`, top: `${(p.y ?? 0) * 100}%` }}
           >
             {p.pin}
@@ -161,7 +161,9 @@ export function ProofReview({
           {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
         </div>
         <ol className="flex-1 overflow-y-auto">
-          {shown.length === 0 && <li className="px-4 py-6 text-center text-sm text-stone-500">No comments yet.</li>}
+          {shown.length === 0 && (
+            <li className="px-4 py-6 text-center text-sm text-stone-500">{pins.length ? "All comments are resolved." : "No comments yet."}</li>
+          )}
           {shown.map((p) => (
             <li
               key={p.id}
@@ -173,7 +175,7 @@ export function ProofReview({
                   type="button"
                   onClick={() => select(p.id)}
                   aria-label={`Show comment ${p.pin} on the proof`}
-                  className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${p.resolved ? "bg-stone-400" : "bg-blue-600"}`}
+                  className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${p.resolved ? "bg-stone-400" : "bg-sky-600"}`}
                 >
                   {p.pin}
                 </button>
