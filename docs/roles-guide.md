@@ -267,9 +267,9 @@ Files open in Excel or Google Sheets.
 
 **Where:** Templates in the sidebar.
 
-- Create a template, then add its tasks: title, **Parent task**, **Start day** (working days from the project start; day 0 is the start), **Pln Dur** (duration in working days, half days allowed, like 0.5), **Pln Hours**, type (Task, Milestone, or part of a milestone), default assignees and open roles, and description.
-- **Laid out like Workfront:** a numbered list with **#, Name, Assignments, Pln Dur, Pln Hours** and the dates for the preview start. Subtasks are indented under their parent, up to 4 levels below a top-level task.
-- **Parent tasks add up their subtasks:** Pln Dur runs from the earliest start to the latest finish, and Pln Hours is the total. Their start, duration and hours can't be typed in, and people and open roles go on the subtasks (when a task gets its first subtask, its people and roles move down onto it).
+- Create a template, then add its tasks: title, **Parent task**, **Starts on day** (working days after the project starts; 0 is the first day), **Planned Duration** (in working days, half days allowed, like 0.5), **Planned Hours**, type (Task, Milestone, or part of a milestone), default assignees and open roles, and description.
+- **Laid out like Workfront:** a numbered list with **#, Name, Assignments, Planned Duration, Planned Hours** and the dates for the preview start. Subtasks are indented under their parent, up to 4 levels below a top-level task.
+- **Parent tasks add up their subtasks:** Planned Duration runs from the earliest start to the latest finish, and Planned Hours is the total. Their start, duration and hours can't be typed in, and people and open roles go on the subtasks (when a task gets its first subtask, its people and roles move down onto it).
 - **Edit** opens a task's form in place. **+ Subtask** adds a task under that row.
 - **Preview dates for a start on** shows the real dates for any start date.
 - Use a template from **+ New project** on the Projects page. The whole structure is copied, with dates from the start date. Default assignees who are inactive are left Unassigned. **Save as template** on a project copies its full structure back into a new template.
