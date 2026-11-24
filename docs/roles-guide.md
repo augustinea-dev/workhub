@@ -277,6 +277,15 @@ Files open in Excel or Google Sheets.
 - **Filters:** this, last or next week; this, last or next month; custom dates; and a team.
 - **Export CSV** follows the view, dates, team and breakdown.
 
+## Workload (Admins only)
+
+- **What it shows:** everyone's planned hours, day by day, starting this week and showing 3 weeks. Scroll right (or select **Show 3 more weeks**) to keep going, up to a year. The arrows move a week at a time; **This week** jumps back. Filter by **Team**.
+- **Each day:** the hours planned from task estimates (the same split as Reports: each task's estimate shared evenly among its people and open roles, over its working days from start to due). Blue is within the person's hours for that day, red is over. Weekends are hatched, holidays say **Holiday**, and a day fully taken by logged time off says **Off**.
+- **Select a day** to see its tasks with their hours; each task links to its page.
+- **Unassigned work** (top row): hours on open roles and on tasks with nobody on them. Hidden when filtering by team.
+- Finished tasks, and parent tasks whose subtasks have estimates, aren't counted. Tasks with an estimate but no dates are listed under Unscheduled in Reports.
+- **Users:** can't open it.
+
 ## Clients
 
 **Where:** Clients in the sidebar.
