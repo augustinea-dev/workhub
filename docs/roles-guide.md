@@ -51,7 +51,8 @@ Every project name is built from its parts, the same way as in Workfront: **refe
   - Fill them in when creating or editing a project; the name updates as you type and is saved automatically.
   - On each client: set **Brand used in project names** and **Billing year** (calendar, or fiscal from a given month). Changing them updates that client's project names.
   - On the Admin page: set the **Next reference number** (it must stay above every number in use) and manage **Project types** (add, rename the label, retire).
-  - For a project imported from Workfront, tick **Keep this exact name** (under "Reference number and exact name") so its name isn't rebuilt.
+  - To overwrite a project's name at any time (for example, shorter for QuickBooks, or a Workfront import), open Edit, then **Reference number and custom name**, tick **Use a custom name** and type it. It stays exactly as typed until unticked. Both the built name and the custom name show a character count.
+  - Starting next year's work early: change **Billing year** and the name rebuilds.
 
 ## Projects list
 

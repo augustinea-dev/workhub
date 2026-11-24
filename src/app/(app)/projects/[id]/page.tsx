@@ -5,7 +5,7 @@ import { AssigneePicker } from "@/components/assignee-picker";
 import { RoleSlotsPicker } from "@/components/role-slots-picker";
 import { Board, type BoardCard } from "@/components/board";
 import { ConfirmDelete, FilterForm, LiveRefresh, SubmitButton, TaskStatusSelect } from "@/components/client";
-import { ProjectNameFields } from "@/components/project-name-fields";
+import { CustomNameInput, ProjectNameFields } from "@/components/project-name-fields";
 import { BudgetBar, Empty, Flash, HealthBadge, PageHeader, ProjectBadge, ProjectDot, TaskBadge } from "@/components/ui";
 import { linkify } from "@/components/linkify";
 import { ASSIGNEES, assigneeLabel, openRoleNames, pickerOptions, shortAssigneeLabel, withAssignees } from "@/lib/assignees";
@@ -472,7 +472,7 @@ export default async function ProjectPage({
                   }}
                 />
                 <details className="rounded-md border border-stone-200 px-3 py-2" open={p.name_locked}>
-                  <summary className="cursor-pointer text-xs font-medium text-stone-600">Reference number and exact name</summary>
+                  <summary className="cursor-pointer text-xs font-medium text-stone-600">Reference number and custom name</summary>
                   <div className="mt-3 space-y-3">
                     <div>
                       <label className="label" htmlFor="reference_number">Reference #</label>
@@ -480,12 +480,9 @@ export default async function ProjectPage({
                     </div>
                     <label className="flex items-start gap-2 text-sm text-stone-700">
                       <input type="checkbox" name="name_locked" defaultChecked={p.name_locked} className="mt-1" />
-                      <span>Keep this exact name instead of building it (for projects imported from Workfront)</span>
+                      <span>Use a custom name instead of building it (for example, shorter for QuickBooks, or a Workfront import). It stays exactly as typed until you untick this.</span>
                     </label>
-                    <div>
-                      <label className="label" htmlFor="name">Exact name</label>
-                      <input id="name" name="name" defaultValue={p.name} className="input w-full" />
-                    </div>
+                    <CustomNameInput defaultValue={p.name} />
                   </div>
                 </details>
                 <div className="grid grid-cols-2 gap-3">
