@@ -200,6 +200,7 @@ People hold one or more **job roles** (Designer, Copywriter, Web Ops, Client Par
     - Task rows: every open task you're assigned to, anything you logged time on that week, and **Add a task** for any other open task.
     - **Job role** per task row, starting from your main role.
     - Each project's heading shows its **budget bar** (everyone's hours against the task estimates, the same as on the project page). Hours you type count toward it right away, marked "unsaved" until you save, so you can see if the week puts the project over. Projects without estimates show no bar.
+    - Under each task you're assigned, **allocated hours**: your share of the task's estimate (split evenly among its assignees and open roles, the same split Reports uses) against everything you've logged on it, for example "6 of 8 h allocated". Hours you type count right away. It turns red with the hours over. Parent tasks with estimated subtasks show it on the subtasks instead. Admins viewing someone's sheet see that person's numbers.
     - To add a note, hover an hours box and select the pencil in its corner, or press Enter in the box. The note opens right next to the box; Enter or **Done** closes it, and it's saved with the week. Boxes with a note show a blue pencil, and hovering it shows the note.
     - **Save week** and **Add a task** stay pinned to the bottom of the screen on a long sheet.
     - Changing a cell sets that day's total for the row. If the day had several entries (from the timer, say), they become one, keeping their notes.

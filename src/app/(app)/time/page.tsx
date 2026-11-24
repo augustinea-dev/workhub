@@ -187,6 +187,24 @@ export default async function TimePage({
       ]),
     ),
   );
+  const gridTaskIds = workRows.filter((r) => r.kind === "task").map((r) => r.key.slice(2));
+  if (gridTaskIds.length) {
+    const [{ data: est }, { data: kids }, { data: mine }] = await Promise.all([
+      supabase.from("tasks").select("id, estimate_hours, task_assignees(profile_id), task_role_slots(role_id)").in("id", gridTaskIds).not("estimate_hours", "is", null),
+      supabase.from("tasks").select("parent_task_id").in("parent_task_id", gridTaskIds).not("estimate_hours", "is", null),
+      supabase.from("time_entries").select("task_id, hours").eq("user_id", userId).in("task_id", gridTaskIds),
+    ]);
+    const parents = new Set((kids ?? []).map((k) => k.parent_task_id as string));
+    const logged = new Map<string, number>();
+    for (const e of mine ?? []) logged.set(e.task_id as string, (logged.get(e.task_id as string) ?? 0) + Number(e.hours));
+    for (const t of (est ?? []) as unknown as { id: string; estimate_hours: number | string; task_assignees: { profile_id: string }[]; task_role_slots: { role_id: string }[] }[]) {
+      if (parents.has(t.id) || !t.task_assignees.some((a) => a.profile_id === userId)) continue;
+      const share = Number(t.estimate_hours) / (t.task_assignees.length + t.task_role_slots.length);
+      const row = grid.get(`t:${t.id}`);
+      if (row && share > 0) row.allocation = { share, logged: logged.get(t.id) ?? 0 };
+    }
+  }
+
   const budgets: ProjectBudgets = {};
   gridProjectIds.forEach((id, i) => {
     const [{ data: t }, { data: e }] = budgetData[i];
